@@ -2,8 +2,12 @@ import paho.mqtt.client as mqtt
 import justpy as jp
 import asyncio
 import psycopg2
-import datetime
+from datetime import datetime
+import time
 import os
+
+# TODO: - Single field with current values instead of graph
+#       - updates dont work with timestamps
 
 def on_connect(client, userdata, flags, rc):
     #print("Connected with result code "+str(rc))
@@ -14,7 +18,7 @@ def on_message(client, userdata, msg):
     payload = msg.payload.decode()
     topic = msg.topic.split("/")[-1]
     timestamp, payload = payload.split(",",1)
-    t = datetime.fromtimestamp(timestamp)
+    t = datetime.fromtimestamp(int(timestamp))
     if topic == "wahrer-wind":
         twd, tws = map(float, payload.split(","))
 
@@ -32,12 +36,15 @@ def on_message(client, userdata, msg):
             chart_true_wind_direction_15.options.series[0].data.pop(0)
         chart_true_wind_direction_15.options.series[0].data.append([t, twd])
 
+        true_wind_speed_field.text = str(round(tws / 1.852, 2))
+        true_wind_direction_field.text = str(twd)
+
         # TODO: calculate base wind, outliers
 
         query = "INSERT INTO 'TrueWind' VALUES(%s, %s, %s);"
 
-        cur.execute(query, (timestamp, twd, tws))
-        conn.commit()
+        #cur.execute(query, (timestamp, twd, tws))
+        #conn.commit()
 
     elif topic == "scheinbarer-wind":
         awd, aws = map(float, payload.split(","))
@@ -56,18 +63,24 @@ def on_message(client, userdata, msg):
             chart_apparent_wind_direction_15.options.series[0].data.pop(0)
         chart_apparent_wind_direction_15.options.series[0].data.append([t, awd])
 
+        apparent_wind_speed_field.text = str(round(aws / 1.852, 2))
+        apparent_wind_direction_field.text = str(awd)
+
         query = "INSERT INTO 'ApparentWind' VALUES(%s, %s, %s);"
 
-        cur.execute(query, (timestamp, awd, aws))
-        conn.commit()
+
+
+        #cur.execute(query, (timestamp, awd, aws))
+        #conn.commit()
 
     elif topic == "position":
-        lat, lat_dir, lon, lon_dir, spd_over_grnd, heading = map(float, payload.split(","))
+        #lat, lat_dir, lon, lon_dir, spd_over_grnd, heading = map(float, payload.split(","))
         pass
     elif topic == "wetter":
         pass
 
     # store message in database
+    print(payload, t)
 
 def get_wind_spd_chart_dict(title):
     return {
@@ -273,12 +286,21 @@ def init_db():
     cur.execute(queryPosition)
     con.commit()
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-con = psycopg2.connect(DATABASE_URL)
-cur = con.cursor()
-init_db()
+#DATABASE_URL = os.environ.get("DATABASE_URL")
+#con = psycopg2.connect(DATABASE_URL)
+#cur = con.cursor()
+#init_db()
 
 wp = jp.WebPage(delete_flag=False)
+
+jp.P(text="TWS:", a=wp)
+true_wind_speed_field = jp.P(text="NaN",a=wp)
+jp.P(text="TWD:", a=wp)
+true_wind_direction_field = jp.P(text="NaN",a=wp)
+jp.P(text="AWS:", a=wp)
+apparent_wind_speed_field = jp.P(text="NaN",a=wp)
+jp.P(text="AWD:", a=wp)
+apparent_wind_direction_field = jp.P(text="NaN",a=wp)
 
 chart_true_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Wahre Windgeschwindigkeit letzte 15 Minuten"), classes='m-1 p-2 border w-10/12')
 chart_apparent_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Scheinbare Windgeschwindigkeit letzte 15 Minuten"), classes='m-1 p-2 border w-10/12')
@@ -296,6 +318,11 @@ async def start_updater():
 
 async def chart_test():
     # load true wind from db
+    # query = "SELECT direction, speed FROM TrueWind WHERE timestamp >= " + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+    # cur.execute(query)
+    # results = cur.fetchall()
+
+    # chart_true_wind_speed_15.
 
     # load apparent wind from db
 
@@ -303,4 +330,4 @@ async def chart_test():
 
 if __name__ == '__main__':
     mqtt_connect()
-    jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=8000)
+    jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=80)
