@@ -3,3 +3,4 @@ justpy
 asyncio
 psycopg2
 uvicorn
+gunicorn
