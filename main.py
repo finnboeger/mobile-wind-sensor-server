@@ -6,6 +6,8 @@ from datetime import datetime
 import time
 import os
 
+app = jp.app
+
 # TODO: - Single field with current values instead of graph
 #       - updates dont work with timestamps
 
@@ -330,4 +332,4 @@ async def chart_test():
 
 if __name__ == '__main__':
     mqtt_connect()
-    jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=80)
+    jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=80, start_server=False)

@@ -2,3 +2,4 @@ paho-mqtt
 justpy
 asyncio
 psycopg2
+uvicorn
