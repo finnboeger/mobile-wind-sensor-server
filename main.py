@@ -318,6 +318,7 @@ async def periodic_updater():
 async def start_updater():
     jp.run_task(periodic_updater())
 
+@jp.SetRoute('/')
 async def chart_test():
     # load true wind from db
     # query = "SELECT direction, speed FROM TrueWind WHERE timestamp >= " + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
