@@ -381,11 +381,18 @@ async def chart_test():
     cur.execute(query)
     results = cur.fetchall()
 
-    print(results)
-
-    # chart_true_wind_speed_15.
+    for id, timestamp, twd, tws in results:
+        chart_true_wind_speed_15.options.series[0].data.push([timestamp * 1000, tws])
+        chart_true_wind_direction_15.options.series[0].data.push([timestamp * 1000, twd])
 
     # load apparent wind from db
+    query = 'SELECT * FROM "ApparentWind"'# WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+    cur.execute(query)
+    results = cur.fetchall()
+
+    for id, timestamp, awd, aws in results:
+        chart_apparent_wind_speed_15.options.series[0].data.push([timestamp * 1000, aws])
+        chart_apparent_wind_direction_15.options.series[0].data.push([timestamp * 1000, awd])
 
     return wp
 
