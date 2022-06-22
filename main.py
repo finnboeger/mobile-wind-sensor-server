@@ -318,7 +318,7 @@ def calc_avg_speed_dir(l1, l2, duration=5*60):
 
     last = l[-1][0]
     matching = [(x[1], x[3]) for x in l if x[0] >= last - duration]
-    combined = reduce(lambda x, y: combine_forces(*x, *y))
+    combined = reduce(lambda x, y: combine_forces(*x, *y), matching)
     return (combined[0], combined[1] / len(matching))
 
 
@@ -377,7 +377,7 @@ async def start_updater():
 @jp.SetRoute('/')
 async def chart_test():
     # load true wind from db
-    query = 'SELECT * FROM "TrueWind"'# WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+    query = 'SELECT * FROM "TrueWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
     cur.execute(query)
     results = cur.fetchall()
 
