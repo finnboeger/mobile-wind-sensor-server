@@ -45,7 +45,7 @@ def on_message(client, userdata, msg):
         query = 'INSERT INTO "TrueWind" (timestamp, direction, speed) VALUES (%s, %s, %s);'
 
         cur.execute(query, (int(timestamp), twd, tws))
-        conn.commit()
+        con.commit()
 
     elif topic == "scheinbarer-wind":
         awd, aws = map(float, payload.split(","))
@@ -70,7 +70,7 @@ def on_message(client, userdata, msg):
         query = 'INSERT INTO "ApparentWind" (timestamp, direction, speed) VALUES (%s, %s, %s);'
 
         cur.execute(query, (int(timestamp), awd, aws))
-        conn.commit()
+        con.commit()
 
     elif topic == "position":
         #lat, lat_dir, lon, lon_dir, spd_over_grnd, heading = map(float, payload.split(","))
