@@ -310,6 +310,7 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
     jp.Label(text=label, a=container, classes="text-md absolute top-2 w-full text-center")
     return jp.Div(text="NaN", a=container, classes=text_classes)
 
+# TODO: is a simple avg calculation without  considering strength possibly better?
 def calc_avg_speed_dir(l1, l2, duration=5*60):
     l = [x + y for x,y in zip(l1, l2, strict=True)]
     assert all(map(lambda x: x[0] == x[2], l))
@@ -387,7 +388,7 @@ async def chart_test():
         chart_true_wind_direction_15.options.series[0].data.append([timestamp * 1000, twd])
 
     # load apparent wind from db
-    query = 'SELECT * FROM "ApparentWind"'# WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+    query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
     cur.execute(query)
     results = cur.fetchall()
 
@@ -406,3 +407,4 @@ jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=8000, start_se
 #  - store in db and load from db
 #  - calculate 5 min avg
 #  - filter out gusts in graph
+#  - gps data
