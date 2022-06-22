@@ -43,7 +43,6 @@ def on_message(client, userdata, msg):
         true_wind_direction_field.text = "{:.0f}".format(twd)
 
         twd_avg, tws_avg = calc_avg_speed_dir(chart_true_wind_direction_15.options.series[0].data, chart_true_wind_speed_15.options.series[0].data)
-        print(twd_avg, tws_avg)
 
         true_wind_speed_5min_avg_field.text = "{:.1f}".format(tws_avg)
         true_wind_direction_5min_avg_field.text = "{:.0f}".format(twd_avg)
@@ -319,8 +318,7 @@ def calc_avg_speed_dir(l1, l2, duration=5*60):
         return (0, 0)
 
     last = l[-1][0]
-    print(l)
-    matching = [(x[1], x[3]) for x in l if x[0] >= last - duration]
+    matching = [(x[1], x[3]) for x in l if x[0] >= last - duration*1000]
     combined = reduce(lambda x, y: combine_forces(*x, *y), matching)
     return (combined[0], combined[1] / len(matching))
 
