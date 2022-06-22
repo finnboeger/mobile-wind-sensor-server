@@ -5,6 +5,7 @@ import psycopg2
 from datetime import datetime
 import time
 import os
+from functools import reduce
 
 app = jp.app
 
@@ -40,6 +41,11 @@ def on_message(client, userdata, msg):
         true_wind_speed_field.text = "{:.1f}".format(tws)
         true_wind_direction_field.text = "{:.0f}".format(twd)
 
+        twd_avg, tws_avg = calc_avg_speed_dir(chart_true_wind_direction_15.options.series[0].data, chart_true_wind_speed_15.options.series[0].data)
+
+        true_wind_speed_5min_avg_field.text = "{:.1f}".format(tws_avg)
+        true_wind_direction_5min_avg_field.text = "{:.0f}".format(twd_avg)
+
         # TODO: calculate base wind, outliers
 
         query = 'INSERT INTO "TrueWind" (timestamp, direction, speed) VALUES (%s, %s, %s);'
@@ -66,6 +72,11 @@ def on_message(client, userdata, msg):
 
         apparent_wind_speed_field.text = "{:.1f}".format(aws)
         apparent_wind_direction_field.text = "{:.0f}".format(awd)
+
+        awd_avg, aws_avg = calc_avg_speed_dir(chart_apparent_wind_direction_15.options.series[0].data, chart_apparent_wind_speed_15.options.series[0].data)
+
+        apparent_wind_speed_5min_avg_field.text = "{:.1f}".format(aws_avg)
+        apparent_wind_direction_5min_avg_field.text = "{:.0f}".format(awd_avg)
 
         query = 'INSERT INTO "ApparentWind" (timestamp, direction, speed) VALUES (%s, %s, %s);'
 
@@ -297,6 +308,19 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
     container = jp.Div(a=ancestor, classes="relative flex w-full grow content-center justify-center p-10", style=f"flex-basis: {basis}")
     jp.Label(text=label, a=container, classes="text-md absolute top-2 w-full text-center")
     return jp.Div(text="NaN", a=container, classes=text_classes)
+
+def calc_avg_speed_dir(l1, l2, duration=5*60):
+    l = [x + y for x,y in zip(l1, l2, strict=True)]
+    assert all(map(lambda x: x[0] == x[2], l))
+
+    if len(l) == 0:
+        return (0, 0)
+
+    last = l[-1][0]
+    matching = [(x[1], x[3]) for x in l if x[0] >= last - duration]
+    combined = reduce(lambda x, y: combine_forces(*x, *y))
+    return (combined[0], combined[1] / len(matching))
+
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 con = psycopg2.connect(DATABASE_URL)
