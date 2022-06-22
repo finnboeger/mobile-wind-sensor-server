@@ -265,7 +265,7 @@ def init_db():
           "id" SERIAL primary key,
           "timestamp" INT NOT NULL,
           "direction" DOUBLE PRECISION NOT NULL,
-          "speed" DOUBLE PRECISION NOT NULL,
+          "speed" DOUBLE PRECISION NOT NULL
         )
     """
 
@@ -274,7 +274,7 @@ def init_db():
           "id" SERIAL primary key,
           "timestamp" INT NOT NULL,
           "direction" DOUBLE PRECISION NOT NULL,
-          "speed" DOUBLE PRECISION NOT NULL,
+          "speed" DOUBLE PRECISION NOT NULL
         )
     """
 
@@ -285,7 +285,7 @@ def init_db():
           "lat" DOUBLE PRECISION NOT NULL,
           "lon" DOUBLE PRECISION NOT NULL,
           "heading" DOUBLE PRECISION NOT NULL,
-          "speed" DOUBLE PRECISION NOT NULL,
+          "speed" DOUBLE PRECISION NOT NULL
         )
     """
 
