@@ -23,19 +23,18 @@ def on_message(client, userdata, msg):
     if topic == "wahrer-wind":
         twd, tws = map(float, payload.split(","))
 
-        #if len(chart_true_wind_speed_15.options.series[0].data) == 0:
-        #    chart_true_wind_speed_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
-
-        if len(chart_true_wind_speed_15.options.series[0].data) > 15 * 60:
-            chart_true_wind_speed_15.options.series[0].data.pop(0)
+        for i in range(len(chart_true_wind_speed_15.options.series[0].data)):
+            if chart_true_wind_speed_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
+                chart_true_wind_speed_15.options.series[0].data.pop(0)
+            else:
+                break
         chart_true_wind_speed_15.options.series[0].data.append([t, tws])
 
-
-        #if len(chart_true_wind_direction_15.options.series[0].data) == 0:
-        #    chart_true_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
-
-        if len(chart_true_wind_direction_15.options.series[0].data) > 15 * 60:
-            chart_true_wind_direction_15.options.series[0].data.pop(0)
+        for i in range(len(chart_true_wind_direction_15.options.series[0].data)):
+            if chart_true_wind_direction_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
+                chart_true_wind_direction_15.options.series[0].data.pop(0)
+            else:
+                break
         chart_true_wind_direction_15.options.series[0].data.append([t, twd])
 
         true_wind_speed_field.text = "{:.1f}".format(tws)
@@ -45,24 +44,24 @@ def on_message(client, userdata, msg):
 
         query = "INSERT INTO 'TrueWind' VALUES(%s, %s, %s);"
 
-        cur.execute(query, (timestamp, twd, tws))
+        cur.execute(query, (int(timestamp), twd, tws))
         conn.commit()
 
     elif topic == "scheinbarer-wind":
         awd, aws = map(float, payload.split(","))
 
-        #if len(chart_apparent_wind_speed_15.options.series[0].data) == 0:
-        #    chart_apparent_wind_speed_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
-
-        if len(chart_apparent_wind_speed_15.options.series[0].data) > 15 * 60:
-            chart_apparent_wind_speed_15.options.series[0].data.pop(0)
+        for i in range(len(chart_apparent_wind_speed_15.options.series[0].data)):
+            if chart_apparent_wind_speed_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
+                chart_apparent_wind_speed_15.options.series[0].data.pop(0)
+            else:
+                break
         chart_apparent_wind_speed_15.options.series[0].data.append([t, aws])
 
-        #if len(chart_apparent_wind_direction_15.options.series[0].data) == 0:
-        #    chart_apparent_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
-
-        if len(chart_apparent_wind_direction_15.options.series[0].data) > 15 * 60:
-            chart_apparent_wind_direction_15.options.series[0].data.pop(0)
+        for i in range(len(chart_apparent_wind_direction_15.options.series[0].data)):
+            if chart_apparent_wind_direction_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
+                chart_apparent_wind_direction_15.options.series[0].data.pop(0)
+            else:
+                break
         chart_apparent_wind_direction_15.options.series[0].data.append([t, awd])
 
         apparent_wind_speed_field.text = "{:.1f}".format(aws)
@@ -70,7 +69,7 @@ def on_message(client, userdata, msg):
 
         query = "INSERT INTO 'ApparentWind' VALUES(%s, %s, %s);"
 
-        cur.execute(query, (timestamp, awd, aws))
+        cur.execute(query, (int(timestamp), awd, aws))
         conn.commit()
 
     elif topic == "position":
@@ -354,9 +353,11 @@ async def start_updater():
 @jp.SetRoute('/')
 async def chart_test():
     # load true wind from db
-    # query = "SELECT direction, speed FROM TrueWind WHERE timestamp >= " + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
-    # cur.execute(query)
-    # results = cur.fetchall()
+    query = "SELECT direction, speed FROM TrueWind WHERE timestamp >= " + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+    cur.execute(query)
+    results = cur.fetchall()
+
+    print(results)
 
     # chart_true_wind_speed_15.
 
