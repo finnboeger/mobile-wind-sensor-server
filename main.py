@@ -30,7 +30,6 @@ def on_message(client, userdata, msg):
             chart_true_wind_speed_15.options.series[0].data.pop(0)
         chart_true_wind_speed_15.options.series[0].data.append([t, tws])
 
-        print(chart_true_wind_speed_15.options.series[0].data)
 
         #if len(chart_true_wind_direction_15.options.series[0].data) == 0:
         #    chart_true_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
@@ -103,6 +102,9 @@ def get_wind_spd_chart_dict(title):
             "labels": {
                 "overflow": 'justify'
             }
+        },
+        "time": {
+            "useUTC": False,
         },
         "yAxis": {
             "title": {
@@ -234,6 +236,9 @@ def get_wind_dir_dict(title):
                 "overflow": 'justify'
             }
         },
+        "time": {
+            "useUTC": False,
+        },
         "yAxis": {
             "title": {
                 "text": 'Wind Geschwindigkeit (kn)'
@@ -302,7 +307,6 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
 #init_db()
 
 wp = jp.WebPage(delete_flag=False)
-
 container = jp.Div(a=wp, classes="flex flex-wrap divide-x divide-y border-b font-mono")
 true_wind_direction_field              = build_box(ancestor=container, label="TWD (°):")
 true_wind_speed_field                  = build_box(ancestor=container, label="TWS (kt):")
