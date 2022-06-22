@@ -11,8 +11,9 @@ app = jp.app
 # TODO: - Single field with current values instead of graph
 #       - updates dont work with timestamps
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, _):
     #print("Connected with result code "+str(rc))
+    #print(client,userdata,flags,rc,_)
     client.subscribe("vsaw-wind/messwerte/luv/+")
 
 def on_message(client, userdata, msg):
@@ -247,12 +248,14 @@ def get_wind_dir_dict(title):
     }
 
 def mqtt_connect():
-    client = mqtt.Client()
+    client = mqtt.Client(client_id="", userdata=None, protocol=mqtt.MQTTv5)
     client.on_connect = on_connect
     client.on_message = on_message
+    client.tls_set(tls_version=mqtt.ssl.PROTOCOL_TLS)
     client.username_pw_set("server", "in7EYv5##nIr")
-    client.connect("9954c15a40844950974ce0e3a9ec731f.s1.eu.hivemq.cloud", 1883)
+    client.connect("9954c15a40844950974ce0e3a9ec731f.s1.eu.hivemq.cloud", 8883)
     client.loop_start()
+    print("MQTT Broker connected")
 
 def init_db():
     queryTrueWind = """
@@ -314,6 +317,7 @@ chart_apparent_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict
 async def periodic_updater():
     while True:
         jp.run_task(wp.update())
+        print("updated clients")
         await asyncio.sleep(5)
 
 async def start_updater():
