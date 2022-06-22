@@ -42,7 +42,7 @@ def on_message(client, userdata, msg):
 
         # TODO: calculate base wind, outliers
 
-        query = "INSERT INTO 'TrueWind' VALUES(%s, %s, %s);"
+        query = 'INSERT INTO "TrueWind" VALUES(%s, %s, %s);'
 
         cur.execute(query, (int(timestamp), twd, tws))
         conn.commit()
@@ -67,7 +67,7 @@ def on_message(client, userdata, msg):
         apparent_wind_speed_field.text = "{:.1f}".format(aws)
         apparent_wind_direction_field.text = "{:.0f}".format(awd)
 
-        query = "INSERT INTO 'ApparentWind' VALUES(%s, %s, %s);"
+        query = 'INSERT INTO "ApparentWind" VALUES(%s, %s, %s);'
 
         cur.execute(query, (int(timestamp), awd, aws))
         conn.commit()
