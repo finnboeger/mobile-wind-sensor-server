@@ -42,6 +42,7 @@ def on_message(client, userdata, msg):
         true_wind_direction_field.text = "{:.0f}".format(twd)
 
         twd_avg, tws_avg = calc_avg_speed_dir(chart_true_wind_direction_15.options.series[0].data, chart_true_wind_speed_15.options.series[0].data)
+        print(twd_avg, tws_avg)
 
         true_wind_speed_5min_avg_field.text = "{:.1f}".format(tws_avg)
         true_wind_direction_5min_avg_field.text = "{:.0f}".format(twd_avg)
