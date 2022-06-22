@@ -45,8 +45,8 @@ def on_message(client, userdata, msg):
 
         query = "INSERT INTO 'TrueWind' VALUES(%s, %s, %s);"
 
-        #cur.execute(query, (timestamp, twd, tws))
-        #conn.commit()
+        cur.execute(query, (timestamp, twd, tws))
+        conn.commit()
 
     elif topic == "scheinbarer-wind":
         awd, aws = map(float, payload.split(","))
@@ -70,10 +70,8 @@ def on_message(client, userdata, msg):
 
         query = "INSERT INTO 'ApparentWind' VALUES(%s, %s, %s);"
 
-
-
-        #cur.execute(query, (timestamp, awd, aws))
-        #conn.commit()
+        cur.execute(query, (timestamp, awd, aws))
+        conn.commit()
 
     elif topic == "position":
         #lat, lat_dir, lon, lon_dir, spd_over_grnd, heading = map(float, payload.split(","))
@@ -301,10 +299,10 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
     jp.Label(text=label, a=container, classes="text-md absolute top-2 w-full text-center")
     return jp.Div(text="NaN", a=container, classes=text_classes)
 
-#DATABASE_URL = os.environ.get("DATABASE_URL")
-#con = psycopg2.connect(DATABASE_URL)
-#cur = con.cursor()
-#init_db()
+DATABASE_URL = os.environ.get("DATABASE_URL")
+con = psycopg2.connect(DATABASE_URL)
+cur = con.cursor()
+init_db()
 
 wp = jp.WebPage(delete_flag=False)
 container = jp.Div(a=wp, classes="flex flex-wrap divide-x divide-y border-b font-mono")
