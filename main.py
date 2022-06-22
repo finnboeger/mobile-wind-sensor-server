@@ -250,7 +250,8 @@ def mqtt_connect():
     client = mqtt.Client()
     client.on_connect = on_connect
     client.on_message = on_message
-    client.connect("broker.hivemq.com", 1883)
+    client.username_pw_set("server", "in7EYv5##nIr")
+    client.connect("9954c15a40844950974ce0e3a9ec731f.s1.eu.hivemq.cloud", 1883)
     client.loop_start()
 
 def init_db():
