@@ -8,39 +8,39 @@ import os
 
 app = jp.app
 
-# TODO: - Single field with current values instead of graph
-#       - updates dont work with timestamps
-
 def on_connect(client, userdata, flags, rc, _):
     #print("Connected with result code "+str(rc))
     #print(client,userdata,flags,rc,_)
     client.subscribe("vsaw-wind/messwerte/luv/+")
 
 def on_message(client, userdata, msg):
-    # switch depending on true, apparent, gps
     payload = msg.payload.decode()
     topic = msg.topic.split("/")[-1]
     timestamp, payload = payload.split(",",1)
-    t = datetime.fromtimestamp(int(timestamp))
+    #t = datetime.fromtimestamp(int(timestamp))
+    t = int(timestamp) * 1000
+    # switch depending on true, apparent, gps
     if topic == "wahrer-wind":
         twd, tws = map(float, payload.split(","))
 
-        if len(chart_true_wind_speed_15.options.series[0].data) == 0:
-            chart_true_wind_speed_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
+        #if len(chart_true_wind_speed_15.options.series[0].data) == 0:
+        #    chart_true_wind_speed_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
 
         if len(chart_true_wind_speed_15.options.series[0].data) > 15 * 60:
             chart_true_wind_speed_15.options.series[0].data.pop(0)
-        chart_true_wind_speed_15.options.series[0].data.append([t, round(tws / 1.852, 2)])
+        chart_true_wind_speed_15.options.series[0].data.append([t, tws])
 
-        if len(chart_true_wind_direction_15.options.series[0].data) == 0:
-            chart_true_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
+        print(chart_true_wind_speed_15.options.series[0].data)
+
+        #if len(chart_true_wind_direction_15.options.series[0].data) == 0:
+        #    chart_true_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
 
         if len(chart_true_wind_direction_15.options.series[0].data) > 15 * 60:
             chart_true_wind_direction_15.options.series[0].data.pop(0)
         chart_true_wind_direction_15.options.series[0].data.append([t, twd])
 
-        true_wind_speed_field.text = str(round(tws / 1.852, 2))
-        true_wind_direction_field.text = str(twd)
+        true_wind_speed_field.text = "{:.1f}".format(tws)
+        true_wind_direction_field.text = "{:.0f}".format(twd)
 
         # TODO: calculate base wind, outliers
 
@@ -52,22 +52,22 @@ def on_message(client, userdata, msg):
     elif topic == "scheinbarer-wind":
         awd, aws = map(float, payload.split(","))
 
-        if len(chart_apparent_wind_speed_15.options.series[0].data) == 0:
-            chart_apparent_wind_speed_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
+        #if len(chart_apparent_wind_speed_15.options.series[0].data) == 0:
+        #    chart_apparent_wind_speed_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
 
         if len(chart_apparent_wind_speed_15.options.series[0].data) > 15 * 60:
             chart_apparent_wind_speed_15.options.series[0].data.pop(0)
-        chart_apparent_wind_speed_15.options.series[0].data.append([t, round(aws / 1.852, 2)])
+        chart_apparent_wind_speed_15.options.series[0].data.append([t, aws])
 
-        if len(chart_apparent_wind_direction_15.options.series[0].data) == 0:
-            chart_apparent_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
+        #if len(chart_apparent_wind_direction_15.options.series[0].data) == 0:
+        #    chart_apparent_wind_direction_15.options.plotOptions.spline.pointStart = datetime.fromtimestamp(int(timestamp))
 
         if len(chart_apparent_wind_direction_15.options.series[0].data) > 15 * 60:
             chart_apparent_wind_direction_15.options.series[0].data.pop(0)
         chart_apparent_wind_direction_15.options.series[0].data.append([t, awd])
 
-        apparent_wind_speed_field.text = str(round(aws / 1.852, 2))
-        apparent_wind_direction_field.text = str(awd)
+        apparent_wind_speed_field.text = "{:.1f}".format(aws)
+        apparent_wind_direction_field.text = "{:.0f}".format(awd)
 
         query = "INSERT INTO 'ApparentWind' VALUES(%s, %s, %s);"
 
@@ -198,7 +198,6 @@ def get_wind_spd_chart_dict(title):
                     "enabled": False
                 },
                 "pointInterval": 1000, # one second
-                # "pointStart":
             }
         },
         "series": [{
@@ -292,6 +291,11 @@ def init_db():
     cur.execute(queryPosition)
     con.commit()
 
+def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
+    container = jp.Div(a=ancestor, classes="relative flex w-full grow content-center justify-center p-10", style=f"flex-basis: {basis}")
+    jp.Label(text=label, a=container, classes="text-md absolute top-2 w-full text-center")
+    return jp.Div(text="NaN", a=container, classes=text_classes)
+
 #DATABASE_URL = os.environ.get("DATABASE_URL")
 #con = psycopg2.connect(DATABASE_URL)
 #cur = con.cursor()
@@ -299,25 +303,47 @@ def init_db():
 
 wp = jp.WebPage(delete_flag=False)
 
-jp.P(text="TWS:", a=wp)
-true_wind_speed_field = jp.P(text="NaN",a=wp)
-jp.P(text="TWD:", a=wp)
-true_wind_direction_field = jp.P(text="NaN",a=wp)
-jp.P(text="AWS:", a=wp)
-apparent_wind_speed_field = jp.P(text="NaN",a=wp)
-jp.P(text="AWD:", a=wp)
-apparent_wind_direction_field = jp.P(text="NaN",a=wp)
+container = jp.Div(a=wp, classes="flex flex-wrap divide-x divide-y border-b font-mono")
+true_wind_direction_field              = build_box(ancestor=container, label="TWD (°):")
+true_wind_speed_field                  = build_box(ancestor=container, label="TWS (kt):")
+true_wind_direction_5min_avg_field     = build_box(ancestor=container, label="TWD 5 Min Avg (°):")
+true_wind_speed_5min_avg_field         = build_box(ancestor=container, label="TWS 5 Min Avg (kt):")
+apparent_wind_direction_field          = build_box(ancestor=container, label="AWD (°):")
+apparent_wind_speed_field              = build_box(ancestor=container, label="AWS (kt):")
+apparent_wind_direction_5min_avg_field = build_box(ancestor=container, label="AWD 5 Min Avg (°):")
+apparent_wind_speed_5min_avg_field     = build_box(ancestor=container, label="AWS 5 Min Avg (kt):")
+gps_position_container                 = build_box(ancestor=container, label="Position (LAT/LON):", basis="33.333%", text_classes="text-right text-5xl")
+gps_position_container.text = ""
+gps_lat_container           = jp.Div(a=gps_position_container)
+gps_lat_field               = jp.Span(a=gps_lat_container)
+gps_lat_dir_field           = jp.Span(a=gps_lat_container)
+gps_lon_container           = jp.Div(a=gps_position_container)
+gps_lon_field               = jp.Span(a=gps_lon_container)
+gps_lon_dir_field           = jp.Span(a=gps_lon_container)
+gps_speed_field                        = build_box(ancestor=container, label="SOG (kt):", basis="33.333%")
+gps_heading_field                      = build_box(ancestor=container, label="HDG (°):", basis="33.333%")
 
-chart_true_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Wahre Windgeschwindigkeit letzte 15 Minuten"), classes='m-1 p-2 border w-10/12')
-chart_apparent_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Scheinbare Windgeschwindigkeit letzte 15 Minuten"), classes='m-1 p-2 border w-10/12')
+chart_true_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Wahre Windgeschwindigkeit letzte 15 Minuten"), classes='p-2 border w-full')
+chart_true_wind_speed_15.update_animation = False
+chart_true_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict("Wahre Windrichtung letzte 15 Minuten"), classes='p-2 border w-full')
+chart_true_wind_direction_15.update_animation = False
 
-chart_true_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict("Wahre Windrichtung letzte 15 Minuten"), classes='m-1 p-2 border w-10/12')
-chart_apparent_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict("Scheinbare Windrichtung letzte 15 Minuten"), classes='m-1 p-2 border w-10/12')
+chart_apparent_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Scheinbare Windgeschwindigkeit letzte 15 Minuten"), classes='p-2 border w-full')
+chart_apparent_wind_speed_15.update_animation = False
+chart_apparent_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict("Scheinbare Windrichtung letzte 15 Minuten"), classes='p-2 border w-full')
+chart_apparent_wind_direction_15.update_animation = False
+
+def combine_forces(angle1, force1, angle2, force2):
+	vector1 = (force1 * math.cos(math.radians(angle1)), force1 * math.sin(math.radians(angle1)))
+	vector2 = (force2 * math.cos(math.radians(angle2)), force2 * math.sin(math.radians(angle2)))
+	vector_r = (vector1[0] + vector2[0], vector1[1] + vector2[1])
+	result_angle = (math.degrees(math.atan2(vector_r[1], vector_r[0]))) % 360
+	result_magnitude = math.sqrt(vector_r[0]**2 + vector_r[1]**2)
+	return (round(result_angle, 2), round(result_magnitude, 2))
 
 async def periodic_updater():
     while True:
         jp.run_task(wp.update())
-        print("updated clients")
         await asyncio.sleep(5)
 
 async def start_updater():
@@ -336,6 +362,12 @@ async def chart_test():
 
     return wp
 
-if __name__ == '__main__':
-    mqtt_connect()
-    jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=80, start_server=False)
+#if __name__ == '__main__':
+mqtt_connect()
+jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=8000, start_server=False)
+
+
+# TODO:
+#  - store in db and load from db
+#  - calculate 5 min avg
+#  - filter out gusts in graph
