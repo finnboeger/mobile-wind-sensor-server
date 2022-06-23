@@ -310,6 +310,11 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
     jp.Label(text=label, a=container, classes="text-md absolute top-2 w-full text-center")
     return jp.Div(text="NaN", a=container, classes=text_classes)
 
+def avg(l):
+    if len(l) == 0:
+        return 0
+    return sum(l)/len(l)
+
 # TODO: is a simple avg calculation without  considering strength possibly better?
 def calc_avg_speed_dir(l1, l2, duration=5*60):
     l = [x + y for x,y in zip(l1, l2, strict=True)]
@@ -320,8 +325,11 @@ def calc_avg_speed_dir(l1, l2, duration=5*60):
 
     last = l[-1][0]
     matching = [(x[1], x[3]) for x in l if x[0] >= last - duration*1000]
-    combined = reduce(lambda x, y: combine_forces(*x, *y), matching)
-    return (combined[0], combined[1] / len(matching))
+    #combined = reduce(lambda x, y: combine_forces(*x, *y), matching)
+    #return (combined[0], combined[1] / len(matching))
+    wind_dir = avg(map(lambda x: x[0], matching)) % 360
+    wind_spd = avg(map(lambda x: x[1], matching))
+    return (wind_dir, wind_spd)
 
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -360,6 +368,24 @@ chart_apparent_wind_speed_15.update_animation = False
 chart_apparent_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict("Scheinbare Windrichtung letzte 15 Minuten"), classes='p-2 border w-full')
 chart_apparent_wind_direction_15.update_animation = False
 
+# load true wind from db
+query = 'SELECT * FROM "TrueWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+cur.execute(query)
+results = cur.fetchall()
+
+for id, timestamp, twd, tws in results:
+    chart_true_wind_speed_15.options.series[0].data.append([timestamp * 1000, tws])
+    chart_true_wind_direction_15.options.series[0].data.append([timestamp * 1000, twd])
+
+# load apparent wind from db
+query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+cur.execute(query)
+results = cur.fetchall()
+
+for id, timestamp, awd, aws in results:
+    chart_apparent_wind_speed_15.options.series[0].data.append([timestamp * 1000, aws])
+    chart_apparent_wind_direction_15.options.series[0].data.append([timestamp * 1000, awd])
+
 def combine_forces(angle1, force1, angle2, force2):
 	vector1 = (force1 * math.cos(math.radians(angle1)), force1 * math.sin(math.radians(angle1)))
 	vector2 = (force2 * math.cos(math.radians(angle2)), force2 * math.sin(math.radians(angle2)))
@@ -378,24 +404,6 @@ async def start_updater():
 
 @jp.SetRoute('/')
 async def chart_test():
-    # load true wind from db
-    query = 'SELECT * FROM "TrueWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
-    cur.execute(query)
-    results = cur.fetchall()
-
-    for id, timestamp, twd, tws in results:
-        chart_true_wind_speed_15.options.series[0].data.append([timestamp * 1000, tws])
-        chart_true_wind_direction_15.options.series[0].data.append([timestamp * 1000, twd])
-
-    # load apparent wind from db
-    query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
-    cur.execute(query)
-    results = cur.fetchall()
-
-    for id, timestamp, awd, aws in results:
-        chart_apparent_wind_speed_15.options.series[0].data.append([timestamp * 1000, aws])
-        chart_apparent_wind_direction_15.options.series[0].data.append([timestamp * 1000, awd])
-
     return wp
 
 #if __name__ == '__main__':
