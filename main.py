@@ -13,7 +13,7 @@ app = jp.app
 def on_connect(client, userdata, flags, rc, _):
     #print("Connected with result code "+str(rc))
     #print(client,userdata,flags,rc,_)
-    client.subscribe("vsaw-wind/messwerte/luv/+")
+    client.subscribe("vsaw-wind/messwerte/luv/+", qos=2)
 
 def on_message(client, userdata, msg):
     payload = msg.payload.decode()
@@ -31,6 +31,7 @@ def on_message(client, userdata, msg):
             else:
                 break
         chart_true_wind_speed_15.options.series[0].data.append([t, tws])
+        chart_true_wind_speed_15.options.series[0].data.sort(key=lambda x: x[0])
 
         for i in range(len(chart_true_wind_direction_15.options.series[0].data)):
             if chart_true_wind_direction_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
@@ -38,6 +39,7 @@ def on_message(client, userdata, msg):
             else:
                 break
         chart_true_wind_direction_15.options.series[0].data.append([t, twd])
+        chart_true_wind_direction_15.options.series[0].data.sort(key=lambda x: x[0])
 
         true_wind_speed_field.text = "{:.1f}".format(tws)
         true_wind_direction_field.text = "{:.0f}".format(twd)
@@ -63,6 +65,7 @@ def on_message(client, userdata, msg):
             else:
                 break
         chart_apparent_wind_speed_15.options.series[0].data.append([t, aws])
+        chart_apparent_wind_speed_15.options.series[0].data.sort(key=lambda x: x[0])
 
         for i in range(len(chart_apparent_wind_direction_15.options.series[0].data)):
             if chart_apparent_wind_direction_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
@@ -70,6 +73,7 @@ def on_message(client, userdata, msg):
             else:
                 break
         chart_apparent_wind_direction_15.options.series[0].data.append([t, awd])
+        chart_apparent_wind_direction_15.options.series[0].data.sort(key=lambda x: x[0])
 
         apparent_wind_speed_field.text = "{:.1f}".format(aws)
         apparent_wind_direction_field.text = "{:.0f}".format(awd)
@@ -311,6 +315,7 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
     return jp.Div(text="NaN", a=container, classes=text_classes)
 
 def avg(l):
+    l = list(l)
     if len(l) == 0:
         return 0
     return sum(l)/len(l)
