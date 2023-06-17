@@ -55,8 +55,8 @@ def on_message(client, userdata, msg):
     t = int(timestamp) * 1000
     # switch depending on true, apparent, gps
     if topic == "t":
-        tws = payload[0] * 0.01 * 3.6 / 1.852 # convert m/s to kt
-        twd = math.degrees(payload[1] * 0.0001)
+        tws = round(payload[0] * 0.01 * 3.6 / 1.852, 1) # convert m/s to kt
+        twd = round(math.degrees(payload[1] * 0.0001, 1))
 
         for i in range(len(chart_true_wind_speed_15.options.series[0].data)):
             if chart_true_wind_speed_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
@@ -90,8 +90,8 @@ def on_message(client, userdata, msg):
         con.commit()
 
     elif topic == "a":
-        aws = payload[0] * 0.01 * 3.6 / 1.852 # convert m/s to kt                  
-        awd = math.degrees(payload[1] * 0.0001)
+        aws = round(payload[0] * 0.01 * 3.6 / 1.852, 1) # convert m/s to kt
+        awd = round(math.degrees(payload[1] * 0.0001, 1))
 
 
         for i in range(len(chart_apparent_wind_speed_15.options.series[0].data)):
