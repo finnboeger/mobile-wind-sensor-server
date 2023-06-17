@@ -295,6 +295,7 @@ def get_wind_dir_dict(title):
             "gridLineWidth": 0,
             "ceiling": 360,
             "floor": 0,
+            "formatter": "() => {console.log(this.value); return this.value;}", # TODO: return value using modulo and change values beforehand so that they sit in one band and dont wrap around creating an ugly chart
         },
         "series": [{ "name": "Richtung", "data": [] }],
     }
