@@ -7,23 +7,56 @@ import time
 import os
 from functools import reduce
 import math
+import struct
 
 app = jp.app
 
 def on_connect(client, userdata, flags, rc, _):
     #print("Connected with result code "+str(rc))
     #print(client,userdata,flags,rc,_)
-    client.subscribe("vsaw-wind/messwerte/luv/+", qos=2)
+    client.subscribe("luv/+", qos=2)
+
+def number_to_base(number, base):
+    if number == 0:
+        return [0]
+    digits = []
+    while number > 0:
+        digits.append(int(number % base))
+        number //= base
+    return digits[::-1]
+
+
+def base_to_number(digits, base):
+    number = 0
+    for i, d in enumerate(digits[::-1]):
+        number += d * base ** i
+    return number
+
+def add_leading_zeros(bytes):
+    zeros = 12 - len(bytes)
+    return zeros * b"\x00" + bytes
+
+def decode(bytes):
+    unpacked = struct.unpack("!" + "B" * len(bytes), bytes)
+    digits = [d - 1 for d in number_to_base(base_to_number(unpacked, 255), 256)]
+    try:
+        return add_leading_zeros(struct.pack("!" + "B" * len(digits), *digits))
+    except:
+        print(digits)
+        raise
+
 
 def on_message(client, userdata, msg):
-    payload = msg.payload.decode()
+    #payload = msg.payload.decode()
     topic = msg.topic.split("/")[-1]
-    timestamp, payload = payload.split(",",1)
+    timestamp, *payload = struct.unpack("!QHH", msg.payload)
+    #print(timestamp, payload[0]*0.01, payload[1]*0.0001)
     #t = datetime.fromtimestamp(int(timestamp))
     t = int(timestamp) * 1000
     # switch depending on true, apparent, gps
-    if topic == "wahrer-wind":
-        twd, tws = map(float, payload.split(","))
+    if topic == "t":
+        tws = payload[0] * 0.01 * 3.6 / 1.852 # convert m/s to kt
+        twd = math.degrees(payload[1] * 0.0001)
 
         for i in range(len(chart_true_wind_speed_15.options.series[0].data)):
             if chart_true_wind_speed_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
@@ -56,8 +89,10 @@ def on_message(client, userdata, msg):
         cur.execute(query, (int(timestamp), twd, tws))
         con.commit()
 
-    elif topic == "scheinbarer-wind":
-        awd, aws = map(float, payload.split(","))
+    elif topic == "a":
+        aws = payload[0] * 0.01 * 3.6 / 1.852 # convert m/s to kt                  
+        awd = math.degrees(payload[1] * 0.0001)
+
 
         for i in range(len(chart_apparent_wind_speed_15.options.series[0].data)):
             if chart_apparent_wind_speed_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
@@ -95,7 +130,7 @@ def on_message(client, userdata, msg):
         pass
 
     # store message in database
-    print(payload, t)
+    #print(payload, t)
 
 def get_wind_spd_chart_dict(title):
     return {
@@ -322,7 +357,8 @@ def avg(l):
 
 # TODO: is a simple avg calculation without  considering strength possibly better?
 def calc_avg_speed_dir(l1, l2, duration=5*60):
-    l = [x + y for x,y in zip(l1, l2, strict=True)]
+    assert len(l1) == len(l2)
+    l = [x + y for x,y in zip(l1, l2)]
     assert all(map(lambda x: x[0] == x[2], l))
 
     if len(l) == 0:
@@ -337,7 +373,7 @@ def calc_avg_speed_dir(l1, l2, duration=5*60):
     return (wind_dir, wind_spd)
 
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+DATABASE_URL = os.environ.get("DATABASE_URL") or "host=localhost user=postgres dbname=wind"
 con = psycopg2.connect(DATABASE_URL)
 cur = con.cursor()
 init_db()
