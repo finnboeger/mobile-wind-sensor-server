@@ -388,6 +388,7 @@ apparent_wind_direction_field          = build_box(ancestor=container, label="Ap
 apparent_wind_speed_field              = build_box(ancestor=container, label="Apparent Wind Speed (kt):")
 apparent_wind_direction_5min_avg_field = build_box(ancestor=container, label="AWD 5 Min Avg (°):")
 apparent_wind_speed_5min_avg_field     = build_box(ancestor=container, label="AWS 5 Min Avg (kt):")
+"""
 gps_position_container                 = build_box(ancestor=container, label="Position (LAT/LON):", basis="33.333%", text_classes="text-right text-5xl")
 gps_position_container.text = ""
 gps_lat_container           = jp.Div(a=gps_position_container)
@@ -398,6 +399,7 @@ gps_lon_field               = jp.Span(a=gps_lon_container)
 gps_lon_dir_field           = jp.Span(a=gps_lon_container)
 gps_speed_field                        = build_box(ancestor=container, label="SOG (kt):", basis="33.333%")
 gps_heading_field                      = build_box(ancestor=container, label="HDG (°):", basis="33.333%")
+"""
 
 chart_true_wind_speed_15 = jp.HighCharts(a=wp, options=get_wind_spd_chart_dict("Wahre Windgeschwindigkeit letzte 15 Minuten"), classes='p-2 border w-full')
 chart_true_wind_speed_15.update_animation = False
