@@ -456,7 +456,7 @@ cur.execute(query)
 results = cur.fetchall()
 
 for id, timestamp, twd, tws in results:
-    chart_true_wind_speed_15.options.series[0].data.append([timestamp * 1000, tws])
+    chart_true_wind_speed_15.options.series[0].data.append([timestamp * 1000, round(tws, 1)])
     twd_buffer.append(timestamp, twd)
     #chart_true_wind_direction_15.options.series[0].data.append([twd_buffer.avg(15), timestamp * 1000])
 
@@ -477,7 +477,7 @@ cur.execute(query)
 results = cur.fetchall()
 
 for id, timestamp, awd, aws in results:
-    chart_apparent_wind_speed_15.options.series[0].data.append([timestamp * 1000, aws])
+    chart_apparent_wind_speed_15.options.series[0].data.append([timestamp * 1000, round(aws, 1)])
     awd_buffer.append(timestamp, awd)
     #chart_apparent_wind_direction_15.options.series[0].data.append([awd_buffer.avg(15), timestamp * 1000])
 
