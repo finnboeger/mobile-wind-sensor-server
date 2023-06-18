@@ -8,6 +8,7 @@ import os
 from functools import reduce
 import math
 import struct
+from typing import List
 
 app = jp.app
 
@@ -67,12 +68,12 @@ def on_message(client, userdata, msg):
         chart_true_wind_speed_15.options.series[0].data.sort(key=lambda x: x[0])
 
         for i in range(len(chart_true_wind_direction_15.options.series[0].data)):
-            if chart_true_wind_direction_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
+            if chart_true_wind_direction_15.options.series[0].data[0][1] < t - 15 * 60 * 1000:
                 chart_true_wind_direction_15.options.series[0].data.pop(0)
             else:
                 break
-        chart_true_wind_direction_15.options.series[0].data.append([t, twd])
-        chart_true_wind_direction_15.options.series[0].data.sort(key=lambda x: x[0])
+        chart_true_wind_direction_15.options.series[0].data.append([twd, twd])
+        chart_true_wind_direction_15.options.series[0].data.sort(key=lambda x: x[1])
 
         true_wind_speed_field.text = "{:.1f}".format(tws)
         true_wind_direction_field.text = "{:.0f}".format(twd)
@@ -103,12 +104,12 @@ def on_message(client, userdata, msg):
         chart_apparent_wind_speed_15.options.series[0].data.sort(key=lambda x: x[0])
 
         for i in range(len(chart_apparent_wind_direction_15.options.series[0].data)):
-            if chart_apparent_wind_direction_15.options.series[0].data[0][0] < t - 15 * 60 * 1000:
+            if chart_apparent_wind_direction_15.options.series[0].data[0][1] < t - 15 * 60 * 1000:
                 chart_apparent_wind_direction_15.options.series[0].data.pop(0)
             else:
                 break
-        chart_apparent_wind_direction_15.options.series[0].data.append([t, awd])
-        chart_apparent_wind_direction_15.options.series[0].data.sort(key=lambda x: x[0])
+        chart_apparent_wind_direction_15.options.series[0].data.append([awd, t])
+        chart_apparent_wind_direction_15.options.series[0].data.sort(key=lambda x: x[1])
 
         apparent_wind_speed_field.text = "{:.1f}".format(aws)
         apparent_wind_direction_field.text = "{:.0f}".format(awd)
@@ -268,17 +269,23 @@ def get_wind_spd_chart_dict(title):
 def get_wind_dir_dict(title):
     return {
         "chart": {
-            "type": 'line',
+            "type": 'spline',
             "scrollablePlotArea": {
-                "minWidth": 600,
-                "scrollPositionX": 1
-            }
+                "minWidth": 400,
+                "minHeight": 1400,
+                "scrollPositionX": 1,
+            },
+            "width": 400,
+            "height": 1000,
         },
         "title": {
             "text": title,
             "align": 'left'
         },
-        "xAxis": {
+       # "dataLabels": {
+       #     "format": "{this.x}",
+       # },
+        "yAxis": {
             "type": 'datetime',
             "labels": {
                 "overflow": 'justify'
@@ -287,14 +294,12 @@ def get_wind_dir_dict(title):
         "time": {
             "useUTC": False,
         },
-        "yAxis": {
+        "xAxis": {
             "title": {
-                "text": 'Wind Geschwindigkeit (kn)'
+                "text": 'Wind Richtung (°)'
             },
             "minorGridLineWidth": 0,
             "gridLineWidth": 0,
-            "ceiling": 360,
-            "floor": 0,
             "formatter": "() => {console.log(this.value); return this.value;}", # TODO: return value using modulo and change values beforehand so that they sit in one band and dont wrap around creating an ugly chart
         },
         "series": [{ "name": "Richtung", "data": [] }],
@@ -360,13 +365,13 @@ def avg(l):
 def calc_avg_speed_dir(l1, l2, duration=5*60):
     assert len(l1) == len(l2)
     l = [x + y for x,y in zip(l1, l2)]
-    assert all(map(lambda x: x[0] == x[2], l))
+    assert all(map(lambda x: x[1] == x[2], l))
 
     if len(l) == 0:
         return (0, 0)
 
-    last = l[-1][0]
-    matching = [(x[1], x[3]) for x in l if x[0] >= last - duration*1000]
+    last = l[-1][1]
+    matching = [(x[0], x[3]) for x in l if x[1] >= last - duration*1000]
     #combined = reduce(lambda x, y: combine_forces(*x, *y), matching)
     #return (combined[0], combined[1] / len(matching))
     wind_dir = avg(map(lambda x: x[0], matching)) % 360
@@ -419,7 +424,7 @@ results = cur.fetchall()
 
 for id, timestamp, twd, tws in results:
     chart_true_wind_speed_15.options.series[0].data.append([timestamp * 1000, tws])
-    chart_true_wind_direction_15.options.series[0].data.append([timestamp * 1000, twd])
+    chart_true_wind_direction_15.options.series[0].data.append([twd, timestamp * 1000])
 
 # load apparent wind from db
 query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
@@ -428,7 +433,7 @@ results = cur.fetchall()
 
 for id, timestamp, awd, aws in results:
     chart_apparent_wind_speed_15.options.series[0].data.append([timestamp * 1000, aws])
-    chart_apparent_wind_direction_15.options.series[0].data.append([timestamp * 1000, awd])
+    chart_apparent_wind_direction_15.options.series[0].data.append([awd, timestamp * 1000])
 
 def combine_forces(angle1, force1, angle2, force2):
 	vector1 = (force1 * math.cos(math.radians(angle1)), force1 * math.sin(math.radians(angle1)))
