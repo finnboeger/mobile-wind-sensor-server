@@ -418,7 +418,8 @@ chart_apparent_wind_direction_15 = jp.HighCharts(a=wp, options=get_wind_dir_dict
 chart_apparent_wind_direction_15.update_animation = False
 
 # load true wind from db
-query = 'SELECT * FROM "TrueWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+TIME = time.time()
+query = 'SELECT * FROM "TrueWind" WHERE timestamp >= ' + str(int(TIME) - 15*60) + " AND timestamp < " + str(int(TIME)) + " ORDER BY timestamp ASC;"
 cur.execute(query)
 results = cur.fetchall()
 
@@ -427,7 +428,7 @@ for id, timestamp, twd, tws in results:
     chart_true_wind_direction_15.options.series[0].data.append([twd, timestamp * 1000])
 
 # load apparent wind from db
-query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(time.time()) - 15*60) + " ORDER BY timestamp ASC;"
+query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(TIME) - 15*60) + " AND timestamp < " + str(int(TIME)) + " ORDER BY timestamp ASC;"
 cur.execute(query)
 results = cur.fetchall()
 
