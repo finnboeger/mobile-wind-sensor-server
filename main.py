@@ -323,6 +323,7 @@ def get_wind_dir_dict(title):
        # "dataLabels": {
        #     "format": "{this.x}",
        # },
+       # TODO: set order of y axis to have lowest values at the top
         "yAxis": {
             "type": 'datetime',
             "labels": {
@@ -451,6 +452,7 @@ chart_apparent_wind_direction_15.update_animation = False
 
 # load true wind from db
 TIME = time.time()
+TIME = 1687007000
 query = 'SELECT * FROM "TrueWind" WHERE timestamp >= ' + str(int(TIME) - 15*60) + " AND timestamp < " + str(int(TIME)) + " ORDER BY timestamp ASC;"
 cur.execute(query)
 results = cur.fetchall()
@@ -514,9 +516,8 @@ async def chart_test():
     return wp
 
 #if __name__ == '__main__':
-mqtt_connect()
-jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=8000, start_server=False)
-
+# mqtt_connect()
+jp.justpy(chart_test, startup=start_updater, host="0.0.0.0", port=8000, start_server=True)
 
 # TODO:
 #  - store in db and load from db
