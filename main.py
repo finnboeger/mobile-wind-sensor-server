@@ -46,6 +46,44 @@ def decode(bytes):
         print(digits)
         raise
 
+def avg(l):
+    l = list(l)
+    if len(l) == 0:
+        return 0
+    return sum(l)/len(l)
+
+class WBuffer():
+    _buffer: List
+    max_length: int
+
+    def __init__(self, max_length = 15 * 60):
+        self._buffer = []
+        self.max_length = max_length
+
+    def __iter__(self):
+        return self._buffer.__iter__()
+
+    def append(self, timestamp, value):
+        # Prevent data from being added multiple times (e.g. due to resending of messages)
+        if timestamp in map(lambda x: x[0], self._buffer):
+            return
+
+        if len(self._buffer) >= self.max_length:
+            self._buffer.pop(0) # remove first element so that we don't exceed its max size
+        self._buffer.append((timestamp, value))
+
+    def avg(self, timespan, timestamp = 0):
+        if len(self._buffer) == 0:
+            return 0
+        if timespan < 0:
+            # return average for whole buffer if negative timespan is provided
+            return round(avg(list(map(lambda x: x[1], self._buffer))), 1)
+        last_timestamp = timestamp or self._buffer[-1][0]
+        values = [v[1] for v in self._buffer if v[0] >= last_timestamp - timespan and v[0] <= last_timestamp]
+        return round(avg(values), 1)
+
+twd_buffer = WBuffer()
+awd_buffer = WBuffer()
 
 def on_message(client, userdata, msg):
     #payload = msg.payload.decode()
@@ -355,12 +393,6 @@ def build_box(ancestor, label, basis="50%", text_classes="text-7xl"):
     jp.Label(text=label, a=container, classes="text-md absolute top-2 w-full text-center")
     return jp.Div(text="NaN", a=container, classes=text_classes)
 
-def avg(l):
-    l = list(l)
-    if len(l) == 0:
-        return 0
-    return sum(l)/len(l)
-
 # TODO: is a simple avg calculation without  considering strength possibly better?
 def calc_avg_speed_dir(l1, l2, duration=5*60):
     assert len(l1) == len(l2)
@@ -425,7 +457,19 @@ results = cur.fetchall()
 
 for id, timestamp, twd, tws in results:
     chart_true_wind_speed_15.options.series[0].data.append([timestamp * 1000, tws])
-    chart_true_wind_direction_15.options.series[0].data.append([twd, timestamp * 1000])
+    twd_buffer.append(timestamp, twd)
+    #chart_true_wind_direction_15.options.series[0].data.append([twd_buffer.avg(15), timestamp * 1000])
+
+twd_buffer_avg = twd_buffer.avg(-1)
+for timestamp, _ in twd_buffer:
+    avg_value = twd_buffer.avg(15, timestamp)
+    if avg_value >= twd_buffer_avg + 180:
+        corrected_value = avg_value - 360
+    elif avg_value < twd_buffer_avg - 180:
+        corrected_value = avg_value + 360
+    else:
+        corrected_value = avg_value
+    chart_true_wind_direction_15.options.series[0].data.append([corrected_value, timestamp * 1000])
 
 # load apparent wind from db
 query = 'SELECT * FROM "ApparentWind" WHERE timestamp >= ' + str(int(TIME) - 15*60) + " AND timestamp < " + str(int(TIME)) + " ORDER BY timestamp ASC;"
@@ -434,7 +478,20 @@ results = cur.fetchall()
 
 for id, timestamp, awd, aws in results:
     chart_apparent_wind_speed_15.options.series[0].data.append([timestamp * 1000, aws])
-    chart_apparent_wind_direction_15.options.series[0].data.append([awd, timestamp * 1000])
+    awd_buffer.append(timestamp, awd)
+    #chart_apparent_wind_direction_15.options.series[0].data.append([awd_buffer.avg(15), timestamp * 1000])
+
+# TODO: Refactor and also call when updating when new values (needs to replace whole data in that case)
+awd_buffer_avg = awd_buffer.avg(-1)
+for timestamp, _ in awd_buffer:
+    avg_value = awd_buffer.avg(15, timestamp)
+    if avg_value >= awd_buffer_avg + 180:
+        corrected_value = avg_value - 360
+    elif avg_value < awd_buffer_avg - 180:
+        corrected_value = avg_value + 360
+    else:
+        corrected_value = avg_value
+    chart_apparent_wind_direction_15.options.series[0].data.append([corrected_value, timestamp * 1000])
 
 def combine_forces(angle1, force1, angle2, force2):
 	vector1 = (force1 * math.cos(math.radians(angle1)), force1 * math.sin(math.radians(angle1)))
