@@ -277,10 +277,10 @@ def get_wind_spd_chart_dict(title):
         },
         "plotOptions": {
             "spline": {
-                "lineWidth": 4,
+                "lineWidth": 2,
                 "states": {
                     "hover": {
-                        "lineWidth": 5
+                        "lineWidth": 3,
                     }
                 },
                 "marker": {
@@ -323,11 +323,13 @@ def get_wind_dir_dict(title):
        # "dataLabels": {
        #     "format": "{this.x}",
        # },
+       # TODO: set order of y axis to have lowest values at the top
         "yAxis": {
             "type": 'datetime',
             "labels": {
                 "overflow": 'justify'
-            }
+            },
+            "gridLineWidth": 1,
         },
         "time": {
             "useUTC": False,
@@ -337,7 +339,7 @@ def get_wind_dir_dict(title):
                 "text": 'Wind Richtung (°)'
             },
             "minorGridLineWidth": 0,
-            "gridLineWidth": 0,
+            "gridLineWidth": 1,
             "formatter": "() => {console.log(this.value); return this.value;}", # TODO: return value using modulo and change values beforehand so that they sit in one band and dont wrap around creating an ugly chart
         },
         "series": [{ "name": "Richtung", "data": [] }],
