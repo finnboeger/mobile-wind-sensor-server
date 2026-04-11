@@ -1,6 +1,6 @@
 # Wind Dashboard - Realtime Pipeline
 
-A Vue 3 + TypeScript web dashboard for monitoring wind data in real-time, backed by PocketBase with MQTT and LoRaWAN ingestion services.
+A Vue 3 + TypeScript web dashboard for monitoring wind data in real-time, backed by PocketBase with MQTT (Python/Docker) and LoRaWAN (Python/Bare-metal) ingestion services.
 
 ## Architecture Overview
 
@@ -36,19 +36,13 @@ A Vue 3 + TypeScript web dashboard for monitoring wind data in real-time, backed
 │                                                                   │
 │  INGESTION LAYER (DOCKER)                                        │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │ MQTT Ingestion Service                                   │   │
+│  │ MQTT Ingestion Service (Python)                          │   │
 │  │ - Subscribes to MQTT topics                              │   │
 │  │ - Validates 1Hz payloads                                 │   │
 │  │ - Upserts to measurements collection                     │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                   │
-│  INGESTION LAYER (BARE-METAL)                                    │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ LoRaWAN Ingestion Service                                │   │
-│  │ - HTTP listener for LoRaWAN frames                        │   │
-│  │ - Parses and validates frames                            │   │
-│  │ - Upserts to measurements collection                     │   │
-│  └──────────────────────────────────────────────────────────┘   │
+
 │                                                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -80,7 +74,7 @@ See [Docker Deployment Guide](#docker-deployment).
 
 ### Bare-Metal
 
-Dashboard Server + LoRaWAN Ingestion on native OS.
+Dashboard Server (Node.js) on native OS.
 
 ```bash
 # Setup
@@ -94,16 +88,14 @@ npm run build --workspaces
 # Run Dashboard Server
 cd dashboard-server && npm start
 
-# Run LoRaWAN Ingestion (separate terminal)
-cd lora-ingestion && npm start
-
 # Services
 - Dashboard: http://localhost:3000
-- LoRaWAN Ingestion: http://localhost:3001
 - PocketBase: http://localhost:8090 (external)
 ```
 
 See [BARE_METAL_DEPLOYMENT.md](BARE_METAL_DEPLOYMENT.md).
+
+**Note:** LoRaWAN ingestion service will be implemented separately using the lora module.
 
 ## Project Structure
 
@@ -127,23 +119,16 @@ wind-dashboard/
 │   ├── Dockerfile
 │   └── package.json
 │
-├── mqtt-ingestion/                      # MQTT subscriber (Docker only)
+├── mqtt-ingestion/                      # MQTT subscriber (Python, Docker only)
 │   ├── src/
-│   │   ├── index.ts
-│   │   ├── config/
-│   │   │   └── env.ts
-│   │   └── mqttListener.ts
+│   │   ├── main.py
+│   │   ├── config.py
+│   │   └── mqtt_listener.py
+│   ├── requirements.txt
 │   ├── Dockerfile
-│   └── package.json
+│   └── .dockerignore
 │
-├── lora-ingestion/                      # LoRaWAN listener (Bare-metal only)
-│   ├── src/
-│   │   ├── index.ts
-│   │   ├── config/
-│   │   │   └── loader.ts
-│   │   └── loraListener.ts
-│   └── package.json
-│
+
 ├── frontend/                            # Vue 3 dashboard
 │   ├── src/
 │   │   └── main.ts
@@ -281,10 +266,6 @@ docker run -p 8090:8090 ghcr.io/pocketbase/pocketbase:latest
 
 # Terminal 2: Dashboard (dev mode)
 cd dashboard-server
-npm run dev
-
-# Terminal 3: LoRaWAN (dev mode)
-cd lora-ingestion
 npm run dev
 ```
 

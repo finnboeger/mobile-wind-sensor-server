@@ -6,15 +6,11 @@ This guide covers running the Wind Dashboard system on bare-metal (native OS) wi
 
 **Bare-metal deployment includes:**
 - **Dashboard Server**: REST/WebSocket API for frontend, PocketBase bootstrap
-- **LoRaWAN Ingestion Service**: HTTP listener for incoming LoRaWAN frames
-- **Frontend**: Vue 3 + TypeScript web app (served by Dashboard Server)
 
 **External requirement:**
 - **PocketBase**: Database with realtime subscriptions (separate deployment or docker container)
 
-**Not used in bare-metal:**
-- MQTT Ingestion Service (docker-only)
-- MQTT broker
+**Note:** LoRaWAN ingestion service will be implemented separately using the lora module.
 
 ## Prerequisites
 
@@ -81,11 +77,8 @@ Edit `config.json`:
   "logLevel": "info",
   "defaultTimeframeMinutes": 15,
   "directionAverageMode": "weighted",
-  "defaultSmoothingWindowMinutes": 5,
-  "lorawaListenerConfig": {
-    "httpPort": 3001,
-    "httpHost": "0.0.0.0"
-  }
+  "defaultSmoothingWindowMinutes": 5
+}
 }
 ```
 
@@ -104,11 +97,12 @@ Edit `config.json`:
 
 #### 5. Install Dependencies and Build
 
+For **Dashboard Server**:
 ```bash
-# Install workspace dependencies
+# Install workspace dependencies (Node.js only needed here)
 npm install --workspaces
 
-# Build all packages
+# Build dashboard server
 npm run build --workspaces
 ```
 
@@ -134,25 +128,7 @@ Bootstrapping PocketBase...
 
 Access dashboard at: http://localhost:3000
 
-### Start LoRaWAN Ingestion Service
-
-In a new terminal:
-```bash
-cd lora-ingestion
-npm start
-```
-
-Expected output:
-```
-Loading configuration...
-Configuration loaded: http://localhost:8090 (port 3001)
-Authenticating with PocketBase...
-✓ PocketBase authenticated
-✓ LoRaWAN Ingestion Service listening on http://0.0.0.0:3001
-  Health check: http://0.0.0.0:3001/health
-  Ingest frames: POST http://0.0.0.0:3001/api/lora/frames
-  Statistics: http://0.0.0.0:3001/api/stats
-```
+**Note:** LoRaWAN ingestion service will be implemented separately using the lora module.
 
 ## Sending LoRaWAN Frames
 
@@ -203,15 +179,15 @@ Create `/etc/systemd/system/wind-lora.service`:
 
 ```ini
 [Unit]
-Description=Wind LoRaWAN Ingestion Service
-After=network.target wind-dashboard.service
-Wants=wind-dashboard.service
+Description=Wind Dashboard Server
+After=network.target pocketbase.service
+Wants=pocketbase.service
 
 [Service]
 Type=simple
 User=windbot
 WorkingDirectory=/opt/wind-dashboard
-ExecStart=/usr/bin/node /opt/wind-dashboard/lora-ingestion/dist/index.js
+ExecStart=/usr/bin/node /opt/wind-dashboard/dashboard-server/dist/index.js
 Restart=always
 RestartSec=10
 
@@ -222,9 +198,9 @@ WantedBy=multi-user.target
 Enable and start:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable wind-dashboard wind-lora
-sudo systemctl start wind-dashboard wind-lora
-sudo systemctl status wind-dashboard wind-lora
+sudo systemctl enable wind-dashboard
+sudo systemctl start wind-dashboard
+sudo systemctl status wind-dashboard
 ```
 
 ### macOS launchd
@@ -306,14 +282,6 @@ npm run watch
 # Terminal 2: Run dashboard-server
 cd dashboard-server
 npm run dev
-
-# Terminal 3: Watch lora-ingestion
-cd lora-ingestion
-npm run watch
-
-# Terminal 4: Run lora-ingestion
-cd lora-ingestion
-npm run dev
 ```
 
 ## Verification Checklist
@@ -322,7 +290,5 @@ npm run dev
 - [ ] `config.json` is configured with correct URLs and tokens
 - [ ] Dashboard Server starts without errors
 - [ ] Dashboard accessible at http://localhost:3000
-- [ ] LoRaWAN Ingestion Service starts without errors
-- [ ] Health check returns 200: `curl http://localhost:3001/health`
-- [ ] LoRaWAN frame ingestion works (send test frame, verify in PocketBase)
+- [ ] Health check returns 200: `curl http://localhost:3000/health`
 - [ ] Dashboard shows real-time data updates

@@ -61,8 +61,8 @@ services:
   # MQTT Ingestion Service: subscribes to MQTT, writes to PocketBase (Docker only)
   mqtt-ingestion:
     build:
-      context: .
-      dockerfile: mqtt-ingestion/Dockerfile
+      context: ./mqtt-ingestion
+      dockerfile: Dockerfile
     container_name: wind-mqtt-ingestion
     environment:
       # MQTT configuration
@@ -78,7 +78,6 @@ services:
 
       # Service configuration
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      NODE_ENV: production
 
     depends_on:
       pocketbase:
@@ -104,6 +103,7 @@ services:
     networks:
       - wind-network
     restart: unless-stopped
+    # Note: LoRaWAN ingestion service removed for now (will be implemented separately using lora module)
 
 networks:
   wind-network:

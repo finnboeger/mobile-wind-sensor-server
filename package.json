@@ -6,10 +6,9 @@
   "workspaces": [
     "packages/shared",
     "dashboard-server",
-    "mqtt-ingestion",
-    "lora-ingestion",
     "frontend"
   ],
+  "note": "mqtt-ingestion is now a pure Python service (not in workspaces)",
   "scripts": {
     "install": "npm install --workspaces",
     "dev": "npm run dev --workspaces",
