@@ -1,0 +1,23 @@
+{
+  "name": "@wind-dashboard/mqtt-ingestion",
+  "version": "0.1.0",
+  "description": "MQTT to PocketBase ingestion service (Docker only)",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "@wind-dashboard/shared": "*",
+    "mqtt": "^5.4.0",
+    "pocketbase": "^0.20.0",
+    "dotenv": "^16.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0"
+  }
+}

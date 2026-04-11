@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  # PocketBase: shared database with public read / authenticated write
+  pocketbase:
+    image: ghcr.io/pocketbase/pocketbase:latest
+    container_name: wind-dashboard-pocketbase
+    ports:
+      - "${POCKETBASE_PORT:-8090}:8090"
+    volumes:
+      - pocketbase_data:/pb_data
+      - pocketbase_migrations:/pb_migrations
+    environment:
+      - POCKETBASE_ENCRYPTION_KEY=${POCKETBASE_ENCRYPTION_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wind-network
+
+  # Dashboard Server: REST/WS API, PocketBase bootstrap, runs on both docker and bare-metal
+  dashboard-server:
+    build:
+      context: .
+      dockerfile: dashboard-server/Dockerfile
+    container_name: wind-dashboard-server
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    environment:
+      # PocketBase configuration
+      POCKETBASE_URL: http://pocketbase:8090
+      POCKETBASE_ADMIN_TOKEN: ${POCKETBASE_ADMIN_TOKEN}
+      POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-admin@example.com}
+      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-admin}
+
+      # UI defaults
+      DEFAULT_TIMEFRAME_MINUTES: ${DEFAULT_TIMEFRAME_MINUTES:-15}
+      DIRECTION_AVERAGE_MODE: ${DIRECTION_AVERAGE_MODE:-weighted}
+      DEFAULT_SMOOTHING_WINDOW_MINUTES: ${DEFAULT_SMOOTHING_WINDOW_MINUTES:-5}
+
+      # Server configuration
+      PORT: 3000
+      HOST: 0.0.0.0
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
+
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - wind-network
+    restart: unless-stopped
+
+  # MQTT Ingestion Service: subscribes to MQTT, writes to PocketBase (Docker only)
+  mqtt-ingestion:
+    build:
+      context: .
+      dockerfile: mqtt-ingestion/Dockerfile
+    container_name: wind-mqtt-ingestion
+    environment:
+      # MQTT configuration
+      MQTT_HOST: ${MQTT_HOST:-mosquitto}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USER: ${MQTT_USER:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_TOPICS: ${MQTT_TOPICS:-wind/sensor1=sensor_1,wind/sensor2=sensor_2}
+
+      # PocketBase configuration
+      POCKETBASE_URL: http://pocketbase:8090
+      POCKETBASE_ADMIN_TOKEN: ${POCKETBASE_ADMIN_TOKEN}
+
+      # Service configuration
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      NODE_ENV: production
+
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+      dashboard-server:
+        condition: service_healthy
+    networks:
+      - wind-network
+    restart: unless-stopped
+
+  # Optional: Mosquitto MQTT broker (for testing)
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: wind-mosquitto
+    ports:
+      - "${MOSQUITTO_PORT:-1883}:1883"
+    volumes:
+      - mosquitto_config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    environment:
+      - TZ=${TZ:-UTC}
+    networks:
+      - wind-network
+    restart: unless-stopped
+
+networks:
+  wind-network:
+    driver: bridge
+
+volumes:
+  pocketbase_data:
+  pocketbase_migrations:
+  mosquitto_config:
+  mosquitto_data:
+  mosquitto_logs:

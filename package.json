@@ -1,0 +1,24 @@
+{
+  "name": "wind-dashboard-monorepo",
+  "version": "0.1.0",
+  "description": "Wind Dashboard with realtime pipeline: Vue 3 frontend, PocketBase backend, MQTT/LoRaWAN ingestion",
+  "private": true,
+  "workspaces": [
+    "packages/shared",
+    "dashboard-server",
+    "mqtt-ingestion",
+    "lora-ingestion",
+    "frontend"
+  ],
+  "scripts": {
+    "install": "npm install --workspaces",
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0",
+    "@types/node": "^20.10.0"
+  }
+}
