@@ -7,6 +7,7 @@ import json
 import logging
 from typing import Optional
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
 import requests
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ class MqttListener:
 
     def connect(self) -> None:
         """Connect to MQTT broker"""
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+        self.client = mqtt.Client(CallbackAPIVersion.VERSION2)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
@@ -46,21 +47,21 @@ class MqttListener:
             self.client.disconnect()
             logger.info("Disconnected from MQTT broker")
 
-    def _on_connect(self, client, userdata, flags, rc, properties=None):
+    def _on_connect(self, client, userdata, connect_flags, reason_code, properties):
         """MQTT connect callback"""
-        if rc == 0:
+        if reason_code.is_failure:
+            logger.error(f"Failed to connect to MQTT broker, reason code: {reason_code}")
+        else:
             logger.info("✓ Connected to MQTT broker")
             # Subscribe to all topics
             for topic in self.mqtt_config.mqtt_topics:
                 client.subscribe(topic)
                 logger.info(f"✓ Subscribed to: {topic}")
-        else:
-            logger.error(f"Failed to connect to MQTT broker, return code {rc}")
 
-    def _on_disconnect(self, client, userdata, rc, properties=None):
+    def _on_disconnect(self, client, userdata, disconnect_flags, auth_data, reason_code):
         """MQTT disconnect callback"""
-        if rc != 0:
-            logger.warning(f"Unexpected disconnection from MQTT broker: {rc}")
+        if reason_code.is_failure:
+            logger.warning(f"Unexpected disconnection from MQTT broker: {reason_code}")
         else:
             logger.info("Disconnected from MQTT broker")
 
