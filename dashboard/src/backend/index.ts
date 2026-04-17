@@ -1,19 +1,20 @@
 import express from "express";
+import path from "path";
 import PocketBase from "pocketbase";
-import { loadConfig } from "./config/env";
-import { bootstrapPocketBase } from "./pocketbase/bootstrap";
+import { loadConfig } from "./config";
+import { bootstrapPocketBase } from "./bootstrap";
 
 const app = express();
 let pocketbase: PocketBase;
 
 /**
- * Dashboard Server
+ * Wind Dashboard Server
  * 
- * Responsibilities:
- * - PocketBase bootstrap (collection/index creation, security rules)
- * - REST API for UI queries
- * - WebSocket API for realtime updates (via PocketBase subscriptions)
- * - Configuration loading (docker env vars or bare-metal config.json)
+ * Single unified Node.js app that:
+ * - Serves Vue 3 SPA frontend
+ * - Ensures PocketBase collections exist on startup
+ * - Provides REST API for frontend queries
+ * - Supports both Docker and bare-metal deployments
  */
 
 async function main() {
@@ -35,7 +36,11 @@ async function main() {
     // Setup Express middleware
     app.use(express.json());
 
-    // Health check endpoint
+    // Serve static Vue frontend
+    const frontendDir = path.join(__dirname, "../public");
+    app.use(express.static(frontendDir));
+
+    // API endpoints
     app.get("/health", (req, res) => {
       res.json({
         status: "ok",
@@ -44,7 +49,6 @@ async function main() {
       });
     });
 
-    // Configuration endpoint (returns UI defaults, no secrets)
     app.get("/api/config", (req, res) => {
       res.json({
         defaultTimeframeMinutes: config.defaultTimeframeMinutes,
@@ -54,17 +58,19 @@ async function main() {
       });
     });
 
+    // SPA fallback - serve index.html for all other routes
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(frontendDir, "index.html"));
+    });
+
     // Start server
     app.listen(config.port, config.host, () => {
-      console.log(
-        `✓ Dashboard Server listening on http://${config.host}:${config.port}`
-      );
-      console.log(`  Health check: http://${config.host}:${config.port}/health`);
-      console.log(`  Config endpoint: http://${config.host}:${config.port}/api/config`);
+      console.log(`✓ Wind Dashboard started at http://${config.host}:${config.port}`);
+      console.log(`✓ PocketBase: ${config.pocketbaseUrl}`);
     });
   } catch (error) {
     console.error(
-      "Failed to start Dashboard Server:",
+      "Failed to start server:",
       error instanceof Error ? error.message : error
     );
     process.exit(1);
@@ -72,5 +78,3 @@ async function main() {
 }
 
 main();
-
-export { app, pocketbase };

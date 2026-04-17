@@ -20,11 +20,11 @@ services:
     networks:
       - wind-network
 
-  # Dashboard Server: REST/WS API, PocketBase bootstrap, runs on both docker and bare-metal
+  # Dashboard Server: Express + Vue frontend + PocketBase bootstrap
   dashboard-server:
     build:
       context: .
-      dockerfile: dashboard-server/Dockerfile
+      dockerfile: Dockerfile
     container_name: wind-dashboard-server
     ports:
       - "${DASHBOARD_PORT:-3000}:3000"

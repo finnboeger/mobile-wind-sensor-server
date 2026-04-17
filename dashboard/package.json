@@ -1,0 +1,33 @@
+{
+  "name": "wind-dashboard",
+  "version": "0.1.0",
+  "description": "Wind Dashboard - Vue 3 frontend + Node.js/PocketBase backend",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/src/backend/index.js",
+  "scripts": {
+    "install": "npm install",
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev:backend": "ts-node src/backend/index.ts",
+    "dev:frontend": "vite --host",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "tsc",
+    "build:frontend": "vite build",
+    "start": "node dist/src/backend/index.js",
+    "preview": "npm run build && node dist/src/backend/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "pocketbase": "^0.26.8",
+    "vue": "^3.5.0",
+    "echarts": "^6.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.0",
+    "@types/express": "^4.17.17",
+    "@types/node": "^20.10.0",
+    "vite": "^8.0.8",
+    "@vitejs/plugin-vue": "^6.0.6"
+  }
+}
