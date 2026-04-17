@@ -31,7 +31,7 @@ export async function bootstrapPocketBase(
       process.env.POCKETBASE_ADMIN_PASSWORD || ""
     );
 
-    if (!authData.admin || !authData.token) {
+    if (!authData.record || !authData.token) {
       throw new Error("Failed to authenticate with PocketBase admin credentials");
     }
 
