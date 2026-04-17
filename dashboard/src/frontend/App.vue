@@ -101,10 +101,10 @@ async function initializePocketBase() {
 
 async function loadMeasurements() {
   try {
-    const records = await pb.collection('measurements').getList(1, 50, {
+    const records = await pb.collection('measurements').getList<Measurement>(1, 50, {
       sort: '-ts',
     })
-    measurements.value = records.items as Measurement[]
+    measurements.value = records.items
     if (records.items.length > 0) {
       latestMeasurement.value = records.items[0]
       updateCharts()
