@@ -146,23 +146,28 @@ async function ensureIndexes(pb: PocketBase, collectionName: string): Promise<vo
 
 async function applySecurityRules(pb: PocketBase, collectionName: string): Promise<void> {
   // Apply collection-level rules:
-  // - Public read access (listRule: "@request.auth = null")
-  // - Authenticated write access (createRule/updateRule/deleteRule: "@request.auth.id != ''")
+  // - Public read access (empty list/view rules)
+  // - Authenticated write access (create/update/delete rules)
 
   console.log(`Applying security rules to ${collectionName} collection`);
 
   const collection = await pb.collections.getOne(collectionName);
-  collection.listRule = "@request.auth = null"; // Public read
-  collection.createRule = "@request.auth.id != ''"; // Authenticated write
-  collection.updateRule = "@request.auth.id != ''";
-  collection.deleteRule = "@request.auth.id != ''";
 
-  await pb.collections.update(collection.id, {
-    listRule: collection.listRule,
-    createRule: collection.createRule,
-    updateRule: collection.updateRule,
-    deleteRule: collection.deleteRule,
-  });
+  try {
+    await pb.collections.update(collection.id, {
+      // Empty string means public access for list/view in PocketBase.
+      listRule: "",
+      viewRule: "",
+      // Authenticated write
+      createRule: "@request.auth.id != ''",
+      updateRule: "@request.auth.id != ''",
+      deleteRule: "@request.auth.id != ''",
+    });
+  } catch (error: any) {
+    const details = error?.response?.data || error?.response || error;
+    console.error("Failed to apply security rules details:", details);
+    throw error;
+  }
 
   console.log(`✓ Security rules applied`);
 }
