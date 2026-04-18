@@ -23,7 +23,7 @@ services:
   # Dashboard Server: Express + Vue frontend + PocketBase bootstrap
   dashboard-server:
     build:
-      context: .
+      context: ./dashboard
       dockerfile: Dockerfile
     container_name: wind-dashboard-server
     ports:
