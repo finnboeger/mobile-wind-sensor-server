@@ -21,15 +21,14 @@ export interface BootstrapResult {
  * This runs on both Docker and bare-metal deployments
  */
 export async function bootstrapPocketBase(
-  pb: PocketBase
+  pb: PocketBase,
+  adminEmail: string,
+  adminPassword: string
 ): Promise<BootstrapResult> {
   try {
     // Test authentication
     console.log("Testing PocketBase admin authentication...");
-    const authData = await pb.admins.authWithPassword(
-      process.env.POCKETBASE_ADMIN_EMAIL || "admin@example.com",
-      process.env.POCKETBASE_ADMIN_PASSWORD || ""
-    );
+    const authData = await pb.admins.authWithPassword(adminEmail, adminPassword);
 
     if (!authData.record || !authData.token) {
       throw new Error("Failed to authenticate with PocketBase admin credentials");

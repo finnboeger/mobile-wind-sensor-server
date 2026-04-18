@@ -8,7 +8,7 @@
   "scripts": {
     "install": "npm install",
     "dev": "npm run dev:backend & npm run dev:frontend",
-    "dev:backend": "ts-node src/backend/index.ts",
+    "dev:backend": "./scripts/run-local.sh",
     "dev:frontend": "vite --host",
     "typecheck": "npm run typecheck:backend && npm run typecheck:frontend",
     "typecheck:backend": "tsc --noEmit",

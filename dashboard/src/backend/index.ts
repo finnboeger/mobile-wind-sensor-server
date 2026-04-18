@@ -26,11 +26,14 @@ async function main() {
 
     // Initialize PocketBase client
     pocketbase = new PocketBase(config.pocketbaseUrl);
-    pocketbase.authStore.save(config.pocketbaseAdminToken);
 
     // Bootstrap PocketBase collections and security rules
     console.log("Bootstrapping PocketBase...");
-    const bootstrapResult = await bootstrapPocketBase(pocketbase);
+    const bootstrapResult = await bootstrapPocketBase(
+      pocketbase,
+      config.pocketbaseAdminEmail,
+      config.pocketbaseAdminPassword
+    );
     console.log("Bootstrap result:", bootstrapResult);
 
     // Setup Express middleware
