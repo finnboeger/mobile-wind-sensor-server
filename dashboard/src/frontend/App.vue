@@ -66,13 +66,18 @@ let pb: PocketBase
 let directionChart: echarts.ECharts | null = null
 let speedChart: echarts.ECharts | null = null
 
+async function getPocketBaseUrl(): Promise<string> {
+  if (window.location.hostname === 'localhost') {
+    return 'http://localhost:8090'
+  }
+  const res = await fetch('/api/config')
+  const config = await res.json()
+  return config.pocketbaseUrl
+}
+
 async function initializePocketBase() {
   try {
-    // Get config from server
-    const configRes = await fetch('/api/config')
-    const config = await configRes.json()
-
-    pb = new PocketBase(config.pocketbaseUrl)
+    pb = new PocketBase(await getPocketBaseUrl())
 
     // Subscribe to real-time updates
     try {
