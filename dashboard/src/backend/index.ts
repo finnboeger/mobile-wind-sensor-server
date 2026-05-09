@@ -62,7 +62,7 @@ async function main() {
     });
 
     // SPA fallback - serve index.html for all other routes
-    app.get("*", (req, res) => {
+    app.use((req, res) => {
       res.sendFile(path.join(frontendDir, "index.html"));
     });
 
