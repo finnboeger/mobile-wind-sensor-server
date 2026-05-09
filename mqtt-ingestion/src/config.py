@@ -3,6 +3,8 @@ Environment configuration for MQTT Ingestion Service
 
 This service only runs in Docker mode.
 All settings are read from environment variables.
+
+PocketBase authentication uses email/password instead of tokens.
 """
 
 import os
@@ -44,9 +46,13 @@ class MqttConfig:
 
         self.pocketbase_url = self.pocketbase_url.rstrip("/")
 
-        self.pocketbase_admin_token = os.getenv("POCKETBASE_ADMIN_TOKEN")
-        if not self.pocketbase_admin_token:
-            raise ValueError("Missing POCKETBASE_ADMIN_TOKEN environment variable")
+        self.pocketbase_admin_email = os.getenv("POCKETBASE_ADMIN_EMAIL")
+        if not self.pocketbase_admin_email:
+            raise ValueError("Missing POCKETBASE_ADMIN_EMAIL environment variable")
+
+        self.pocketbase_admin_password = os.getenv("POCKETBASE_ADMIN_PASSWORD")
+        if not self.pocketbase_admin_password:
+            raise ValueError("Missing POCKETBASE_ADMIN_PASSWORD environment variable")
 
         self.log_level = os.getenv("LOG_LEVEL", "info").lower()
 

@@ -8,22 +8,37 @@ import logging
 from typing import Optional
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
-import requests
+from pocketbase import PocketBase
 
 logger = logging.getLogger(__name__)
 
 
 class MqttListener:
-    def __init__(self, pocketbase_url: str, pocketbase_token: str, mqtt_config):
+    def __init__(self, pocketbase_url: str, pocketbase_email: str, pocketbase_password: str, mqtt_config):
         self.pocketbase_url = pocketbase_url
-        self.pocketbase_token = pocketbase_token
+        self.pocketbase_email = pocketbase_email
+        self.pocketbase_password = pocketbase_password
+        self.pb: Optional[PocketBase] = None
         self.mqtt_config = mqtt_config
         self.client: Optional[mqtt.Client] = None
 
         self.stats = {"messages_received": 0, "messages_processed": 0, "messages_failed": 0}
 
+    def _authenticate(self) -> None:
+        """Authenticate with PocketBase using admin credentials"""
+        try:
+            self.pb = PocketBase(self.pocketbase_url)
+            self.pb.admins.auth_with_password(self.pocketbase_email, self.pocketbase_password)
+            logger.info("✓ Authenticated with PocketBase")
+        except Exception as e:
+            logger.error(f"Failed to authenticate with PocketBase: {e}")
+            raise
+
     def connect(self) -> None:
-        """Connect to MQTT broker"""
+        """Connect to MQTT broker and authenticate with PocketBase"""
+        # Authenticate with PocketBase first
+        self._authenticate()
+
         self.client = mqtt.Client(CallbackAPIVersion.VERSION2)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
@@ -107,48 +122,24 @@ class MqttListener:
     def write_measurement(self, measurement: dict) -> None:
         """Write or update measurement in PocketBase"""
         try:
-            headers = {
-                "Authorization": self.pocketbase_token,
-                "Content-Type": "application/json",
-            }
-
-            # Check if record exists
+            if self.pb is None:
+                raise ValueError("PocketBase client is not initialized")
             source_id = measurement.get("source_id")
             ts = measurement.get("ts")
 
-            url = f"{self.pocketbase_url}/api/collections/measurements/records"
-            
             # Try to find existing record
-            filter_query = f'(source_id = "{source_id}" && ts = "{ts}")'
-            try:
-                response = requests.get(
-                    url,
-                    headers=headers,
-                    params={"filter": filter_query, "limit": 1},
-                    timeout=5,
-                )
-                response.raise_for_status()
+            filter_query = f'source_id = "{source_id}" && ts = "{ts}"'
+            records = self.pb.collection("measurements").get_list(
+                query_params={"filter": filter_query, "limit": 1}
+            )
 
-                items = response.json().get("items", [])
-                if items:
-                    # Update existing record
-                    record_id = items[0]["id"]
-                    response = requests.patch(
-                        f"{url}/{record_id}",
-                        headers=headers,
-                        json=measurement,
-                        timeout=5,
-                    )
-                else:
-                    # Create new record
-                    response = requests.post(
-                        url, headers=headers, json=measurement, timeout=5
-                    )
-
-                response.raise_for_status()
-            except requests.exceptions.RequestException as e:
-                logger.error(f"PocketBase write error: {e}")
-                raise
+            if records.items:
+                # Update existing record
+                record_id = records.items[0].id
+                self.pb.collection("measurements").update(record_id, measurement)
+            else:
+                # Create new record
+                self.pb.collection("measurements").create(measurement)
 
         except Exception as e:
             logger.error(f"Failed to write measurement to PocketBase: {e}")

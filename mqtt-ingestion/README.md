@@ -179,10 +179,10 @@ Service logs statistics every 30 seconds:
 ## Dependencies
 
 ```
-paho-mqtt==1.6.1    # MQTT client
-requests==2.31.0    # HTTP client
-pydantic==2.5.0     # Data validation (future use)
-python-dotenv==1.0.0 # Env file support (optional)
+paho-mqtt==2.1.0    # MQTT client
+pocketbase==0.17.0    # HTTP client
+pydantic==2.12.0     # Data validation (future use)
+python-dotenv==1.2.0 # Env file support (optional)
 ```
 
 ## Testing

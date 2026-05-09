@@ -11,7 +11,7 @@ Docker-only service that:
 Configuration via environment variables:
 - MQTT_HOST, MQTT_PORT, MQTT_USER, MQTT_PASSWORD
 - MQTT_TOPICS=topic1=source1,topic2=source2
-- POCKETBASE_URL, POCKETBASE_ADMIN_TOKEN
+- POCKETBASE_URL, POCKETBASE_ADMIN_EMAIL, POCKETBASE_ADMIN_PASSWORD
 - LOG_LEVEL (debug, info, warn, error)
 """
 
@@ -29,7 +29,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-mqtt_listener: MqttListener = None
+mqtt_listener: MqttListener
 
 
 def shutdown_handler(signum, frame):
@@ -60,8 +60,16 @@ def main():
 
         # Initialize MQTT listener
         logger.info("Initializing MQTT listener...")
+        if (config.pocketbase_url is None or
+            config.pocketbase_admin_email is None or
+            config.pocketbase_admin_password is None):
+            logger.error("PocketBase configuration is incomplete")
+            sys.exit(1)
         mqtt_listener = MqttListener(
-            config.pocketbase_url, config.pocketbase_admin_token, config
+            config.pocketbase_url,
+            config.pocketbase_admin_email,
+            config.pocketbase_admin_password,
+            config,
         )
 
         # Connect to MQTT
