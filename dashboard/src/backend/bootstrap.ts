@@ -127,8 +127,8 @@ function getRequiredFields(): Array<{ name: string; type: string; required: bool
     { name: "gps_lng", type: "number", required: false },
     { name: "sensor_heading_deg", type: "number", required: false },
     { name: "sensor_speed_mps", type: "number", required: false },
-    { name: "true_wind_dir_deg", type: "number", required: true },
-    { name: "true_wind_speed_mps", type: "number", required: true },
+    { name: "true_wind_dir_deg", type: "number", required: false },
+    { name: "true_wind_speed_mps", type: "number", required: false },
     { name: "apparent_wind_dir_deg", type: "number", required: false },
     { name: "apparent_wind_speed_mps", type: "number", required: false },
   ];
