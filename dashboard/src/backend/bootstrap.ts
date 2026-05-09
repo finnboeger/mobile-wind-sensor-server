@@ -90,7 +90,7 @@ async function getOrCreateCollection(
       return await pb.collections.create({
         name,
         type: "base",
-        schema: [], // Will add fields next
+        fields: getRequiredFields(),
       });
     }
     throw error;
@@ -98,38 +98,40 @@ async function getOrCreateCollection(
 }
 
 async function ensureFields(pb: PocketBase, collection: any): Promise<void> {
-  const requiredFields = {
-    source_id: { type: "text", required: true },
-    ts: { type: "date", required: true },
-    gps_lat: { type: "number", required: false },
-    gps_lng: { type: "number", required: false },
-    sensor_heading_deg: { type: "number", required: false },
-    sensor_speed_mps: { type: "number", required: false },
-    true_wind_dir_deg: { type: "number", required: true },
-    true_wind_speed_mps: { type: "number", required: true },
-    apparent_wind_dir_deg: { type: "number", required: false },
-    apparent_wind_speed_mps: { type: "number", required: false },
-  };
+  const requiredFields = getRequiredFields();
+  const existingFields = collection.fields || [];
+  const existingFieldNames = new Set(existingFields.map((f: any) => f.name));
 
-  const schema = collection.schema || [];
-  const existingFieldNames = schema.map((f: any) => f.name);
+  const missingFields = requiredFields.filter(
+    (field) => !existingFieldNames.has(field.name)
+  );
 
-  for (const [fieldName, fieldConfig] of Object.entries(requiredFields)) {
-    if (!existingFieldNames.includes(fieldName)) {
-      console.log(`Adding field: ${fieldName}`);
-      schema.push({
-        id: `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: fieldName,
-        ...fieldConfig,
-        system: false,
-      });
-    }
+  if (missingFields.length === 0) {
+    return;
   }
 
-  // Update collection with new fields
-  if (schema.length !== existingFieldNames.length) {
-    await pb.collections.update(collection.id, { schema });
+  for (const field of missingFields) {
+    console.log(`Adding field: ${field.name}`);
   }
+
+  await pb.collections.update(collection.id, {
+    fields: [...existingFields, ...missingFields],
+  });
+}
+
+function getRequiredFields(): Array<{ name: string; type: string; required: boolean }> {
+  return [
+    { name: "source_id", type: "text", required: true },
+    { name: "ts", type: "date", required: true },
+    { name: "gps_lat", type: "number", required: false },
+    { name: "gps_lng", type: "number", required: false },
+    { name: "sensor_heading_deg", type: "number", required: false },
+    { name: "sensor_speed_mps", type: "number", required: false },
+    { name: "true_wind_dir_deg", type: "number", required: true },
+    { name: "true_wind_speed_mps", type: "number", required: true },
+    { name: "apparent_wind_dir_deg", type: "number", required: false },
+    { name: "apparent_wind_speed_mps", type: "number", required: false },
+  ];
 }
 
 async function ensureIndexes(pb: PocketBase, collectionName: string): Promise<void> {
