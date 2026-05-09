@@ -74,7 +74,7 @@ async function main() {
   } catch (error) {
     console.error(
       "Failed to start server:",
-      error instanceof Error ? error.message : error
+      error instanceof Error ? `${error.message}\n${error.stack}` : error
     );
     process.exit(1);
   }
