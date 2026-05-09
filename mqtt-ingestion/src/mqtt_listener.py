@@ -5,6 +5,7 @@ Subscribes to MQTT topics and writes validated measurements to PocketBase
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
@@ -92,25 +93,17 @@ class MqttListener:
         self.stats["messages_received"] += 1
 
         try:
-            # Get source_id from topic mapping
-            source_id = self.mqtt_config.mqtt_topics.get(topic)
-            if not source_id:
-                logger.warning(f"Received message on unmapped topic: {topic}")
-                return
-
             # Parse JSON payload
             json_str = payload.decode("utf-8")
-            data = json.loads(json_str)
-
-            # Ensure source_id is set
-            data["source_id"] = source_id
+            payload_data = json.loads(json_str)
+            data = self._normalize_measurement(topic, payload_data)
 
             # Write to PocketBase
             self.write_measurement(data)
             self.stats["messages_processed"] += 1
 
             if self.mqtt_config.log_level == "debug":
-                logger.debug(f"✓ Processed measurement from {source_id}")
+                logger.debug(f"✓ Processed measurement from {data['source_id']}")
 
         except json.JSONDecodeError as e:
             logger.warning(f"Invalid JSON from {topic}: {e}")
@@ -118,6 +111,49 @@ class MqttListener:
         except Exception as e:
             logger.error(f"Failed to process MQTT message: {e}")
             self.stats["messages_failed"] += 1
+
+    def _normalize_measurement(self, topic: str, payload_data: dict) -> dict:
+        """Normalize nested MQTT payload to PocketBase measurement schema."""
+        source_id = payload_data.get("source_id") or self.mqtt_config.mqtt_topics.get(topic)
+        if not source_id:
+            raise ValueError(f"Missing source_id in payload and no topic mapping for '{topic}'")
+
+        timestamp = payload_data.get("timestamp")
+        if timestamp is None:
+            raise ValueError("Missing required field 'timestamp'")
+
+        gps = payload_data.get("gps") or {}
+        true_wind = payload_data.get("true") or {}
+        apparent_wind = payload_data.get("apparent") or {}
+
+        ts_iso = datetime.fromtimestamp(float(timestamp), tz=timezone.utc).isoformat()
+
+        # Support both nested and flat payloads while preserving numeric zeros.
+        true_wind_dir_deg = true_wind.get("direction")
+        if true_wind_dir_deg is None:
+            true_wind_dir_deg = payload_data.get("true_wind_dir_deg")
+
+        true_wind_speed_mps = true_wind.get("speed")
+        if true_wind_speed_mps is None:
+            true_wind_speed_mps = payload_data.get("true_wind_speed_mps")
+
+        if true_wind_dir_deg is None:
+            raise ValueError("Missing required field 'true.direction' (or 'true_wind_dir_deg')")
+        if true_wind_speed_mps is None:
+            raise ValueError("Missing required field 'true.speed' (or 'true_wind_speed_mps')")
+
+        return {
+            "source_id": source_id,
+            "ts": ts_iso,
+            "gps_lat": gps.get("lat"),
+            "gps_lng": gps.get("lon"),
+            "sensor_heading_deg": gps.get("heading"),
+            "sensor_speed_mps": gps.get("speed"),
+            "true_wind_dir_deg": float(true_wind_dir_deg),
+            "true_wind_speed_mps": float(true_wind_speed_mps),
+            "apparent_wind_dir_deg": apparent_wind.get("direction"),
+            "apparent_wind_speed_mps": apparent_wind.get("speed"),
+        }
 
     def write_measurement(self, measurement: dict) -> None:
         """Write or update measurement in PocketBase"""
