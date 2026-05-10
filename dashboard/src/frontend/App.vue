@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import PocketBase from 'pocketbase'
 import * as echarts from 'echarts'
 
@@ -232,8 +232,16 @@ function initCharts() {
 }
 
 onMounted(() => {
-  initCharts()
   initializePocketBase()
+})
+
+// Initialize charts once content becomes visible
+watch(loading, async (isLoading) => {
+  if (!isLoading) {
+    console.log('Content visible, initializing charts...')
+    await nextTick()
+    initCharts()
+  }
 })
 </script>
 
