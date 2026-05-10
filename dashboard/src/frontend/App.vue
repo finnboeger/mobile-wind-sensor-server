@@ -64,7 +64,7 @@ const lastUpdateTime = ref('')
 const chartsReady = ref(false)
 const timeFrameMinutes = ref(30);
 
-// Set to false to render newest direction samples at the bottom.
+// Set to true to render newest direction samples at the bottom.
 const directionOldestAtTop = ref(false)
 
 let pb: PocketBase
