@@ -268,7 +268,9 @@ function initCharts() {
         smooth: false,
         symbol: 'circle',
         symbolSize: 5,
+        showSymbol: false,
         data: [],
+        animation: false,
         itemStyle: {
           color: '#667eea',
         },
@@ -290,6 +292,8 @@ function initCharts() {
     xAxis: {
       type: 'category',
       name: 'Time',
+      // our data is sorted newest to oldest, we reverse it to show the graph with newest on the right
+      inverse: true,
       nameLocation: "middle",
       nameTextStyle: {
         padding: [8, 0, 0, 0],
@@ -301,7 +305,7 @@ function initCharts() {
       name: 'Speed (m/s)',
       nameLocation: "middle",
       nameTextStyle: {
-        padding: [0, 0, 20, 0],
+        padding: [0, 0, 12, 0],
       },
     },
     series: [
@@ -309,9 +313,11 @@ function initCharts() {
         name: 'Wind Speed',
         type: 'line',
         data: [],
+        animation: false,
         smooth: true,
         symbol: 'circle',
         symbolSize: 4,
+        showSymbol: false,
         itemStyle: {
           color: '#764ba2',
         },
