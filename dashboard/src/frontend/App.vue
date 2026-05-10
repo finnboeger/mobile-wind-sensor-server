@@ -89,6 +89,8 @@ async function initializePocketBase() {
           updateTime()
         }
       })
+      // Initialize with latest measurements
+      await loadMeasurements()
     } catch (e) {
       console.log('Realtime subscription not available, falling back to polling')
       // Fallback: load latest measurements
