@@ -65,7 +65,7 @@ const chartsReady = ref(false)
 const timeFrameMinutes = ref(30);
 
 // Set to false to render newest direction samples at the bottom.
-const directionNewestAtTop = ref(true)
+const directionOldestAtTop = ref(false)
 
 let pb: PocketBase
 let directionChart: echarts.ECharts | null = null
@@ -182,7 +182,7 @@ function updateCharts() {
   const directionPoints = measurements.value
     .map((m) => ({
       direction: m.true_wind_dir_deg,
-      time: new Date(m.ts).toLocaleTimeString(),
+      timeMs: new Date(m.ts).getTime(),
     }))
 
   if (directionChart && directionPoints.length > 0) {
@@ -242,13 +242,17 @@ function updateCharts() {
           },
         ],
         yAxis: {
-          data: normalizedPoints.map((p) => p.time),
-          inverse: directionNewestAtTop.value,
+          type: 'time',
+          inverse: directionOldestAtTop.value,
+          axisLabel: {
+            formatter: (value: number) => new Date(value).toLocaleTimeString(),
+          },
         },
         series: [
           {
             data: normalizedPoints.map((p) => p.direction),
             markLine: {
+              symbol: directionOldestAtTop.value ? ['none', 'arrow'] : ['arrow', 'none'],
               data: [
                 {
                   name: 'Average',
@@ -259,7 +263,7 @@ function updateCharts() {
                     width: 2,
                   },
                   label: {
-                    position: 'end',
+                    position: directionOldestAtTop.value ? 'end' : 'start',
                     formatter: `Avg: ${avgDirection.toFixed(1)}°`,
                   },
                 },
@@ -360,18 +364,18 @@ function initCharts() {
       },
     ],
     yAxis: {
-      type: 'category',
+      type: 'time',
       name: 'Time',
       nameLocation: "middle",
       nameTextStyle: {
         padding: [0, 0, 48, 0],
       },
-      data: [],
-      inverse: directionNewestAtTop.value,
+      inverse: directionOldestAtTop.value,
       axisLabel: {
         inside: false,
         margin: 8,
         padding: [8, 0, 0, 0],
+        formatter: (value: number) => new Date(value).toLocaleTimeString(),
       },
       axisLine: {
         show: false,
