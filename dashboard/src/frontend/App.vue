@@ -332,7 +332,7 @@ function initCharts() {
         position: "top",
         axisLabel: {
           formatter: (value: number) => {
-            return `${value % 360}`
+            return `${(value + 360) % 360}`
           },
         },
       },
