@@ -170,8 +170,19 @@ function updateCharts() {
       ? directionPoints.reduce((sum, p) => sum + p.direction, 0) / directionPoints.length 
       : 0
 
-    // Display ±180 degrees centered on average
-    const displaySpan = 180
+    // Compute displaySpan based on largest distance from average
+    let maxDistance = 0
+    for (const point of directionPoints) {
+      let distance = Math.abs(point.direction - avgDirection)
+      // Handle wrap-around: the shortest distance might be the other way
+      if (distance > 180) {
+        distance = 360 - distance
+      }
+      maxDistance = Math.max(maxDistance, distance)
+    }
+    
+    // Add 10% padding and cap at 180
+    const displaySpan = Math.min(180, maxDistance + 5)
     let axisMin = avgDirection - displaySpan
     let axisMax = avgDirection + displaySpan
 
