@@ -125,12 +125,12 @@ async function loadMeasurements() {
     })
     console.log('Loaded', records.items.length, 'measurements')
     if (records.items.length > 0) {
-      latestMeasurement.value = records.items[0] 
+      latestMeasurement.value = records.items[0];
       console.log('Latest measurement:', {...latestMeasurement.value})
       measurements.value = records.items.filter(
         (m) => 
           new Date(m.ts).getTime() >
-          new Date(latestMeasurement.value?.ts).getTime()
+          new Date((latestMeasurement.value ?? fail("unreachable: no latest measurement")).ts).getTime()
            - timeFrameMinutes.value * 60 * 1000)
       updateCharts()
       updateTime()
@@ -165,7 +165,12 @@ function updateCharts() {
     }))
 
   if (directionChart && directionPoints.length > 0) {
-    console.log('Updating direction chart with', directionPoints.length, 'points, first:', directionPoints[0])
+    // Calculate average wind direction
+    const avgDirection = directionPoints.length > 0 
+      ? directionPoints.reduce((sum, p) => sum + p.direction, 0) / directionPoints.length 
+      : 0
+    
+    console.log('Updating direction chart with', directionPoints.length, 'points, average:', avgDirection.toFixed(1))
     try {
       directionChart.setOption({
         yAxis: {
@@ -175,6 +180,23 @@ function updateCharts() {
         series: [
           {
             data: directionPoints.map((p) => p.direction),
+            markLine: {
+              data: [
+                {
+                  name: 'Average',
+                  xAxis: avgDirection,
+                  lineStyle: {
+                    color: '#667eea',
+                    type: 'dashed',
+                    width: 2,
+                  },
+                  label: {
+                    position: 'end',
+                    formatter: `Avg: ${avgDirection.toFixed(1)}°`,
+                  },
+                },
+              ],
+            },
           },
         ],
       })
