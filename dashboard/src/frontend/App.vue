@@ -70,6 +70,10 @@ let pb: PocketBase
 let directionChart: echarts.ECharts | null = null
 let speedChart: echarts.ECharts | null = null
 
+function fail(reason: string): never {
+  throw new Error(reason);
+}
+
 async function getPocketBaseUrl(): Promise<string> {
   if (window.location.hostname === 'localhost') {
     return 'http://localhost:8090'
@@ -207,101 +211,86 @@ function updateCharts() {
 }
 
 function initCharts() {
+  const dirContainer = document.getElementById('wind-direction-chart') ?? fail('Direction chart container not found');
+  const speedContainer = document.getElementById('wind-speed-chart') ?? fail('Speed chart container not found');
+
   // Wind direction chart
-  const dirContainer = document.getElementById('wind-direction-chart')
-  if (dirContainer) {
-    try {
-      directionChart = echarts.init(dirContainer)
-      directionChart.setOption({
-        title: { text: 'True Wind Direction Over Time' },
-        grid: {
-          left: '80px',
-          right: '30px',
-          bottom: '30px',
-          top: '60px',
-          containLabel: true,
+  directionChart = echarts.init(dirContainer)
+  directionChart.setOption({
+    title: { text: 'True Wind Direction Over Time' },
+    grid: {
+      left: '80px',
+      right: '30px',
+      bottom: '30px',
+      top: '60px',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'value',
+      name: 'Direction (deg)',
+      min: 0,
+      max: 360,
+    },
+    yAxis: {
+      type: 'category',
+      name: 'Time',
+      data: [],
+      inverse: directionNewestAtTop.value,
+    },
+    series: [
+      {
+        name: 'Direction',
+        type: 'line',
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 5,
+        data: [],
+        itemStyle: {
+          color: '#667eea',
         },
-        xAxis: {
-          type: 'value',
-          name: 'Direction (deg)',
-          min: 0,
-          max: 360,
-        },
-        yAxis: {
-          type: 'category',
-          name: 'Time',
-          data: [],
-          inverse: directionNewestAtTop.value,
-        },
-        series: [
-          {
-            name: 'Direction',
-            type: 'line',
-            smooth: false,
-            symbol: 'circle',
-            symbolSize: 5,
-            data: [],
-            itemStyle: {
-              color: '#667eea',
-            },
-          },
-        ],
-      })
-      console.log('✓ Direction chart initialized')
-    } catch (e) {
-      console.error('Error initializing direction chart:', e)
-    }
-  } else {
-    console.error('wind-direction-chart container not found!')
-  }
+      },
+    ],
+  })
+  console.log('✓ Direction chart initialized')
 
   // Wind speed chart
-  const speedContainer = document.getElementById('wind-speed-chart')
-  if (speedContainer) {
-    try {
-      speedChart = echarts.init(speedContainer)
-      speedChart.setOption({
-        title: { text: 'True Wind Speed' },
-        grid: {
-          left: '60px',
-          right: '30px',
-          bottom: '60px',
-          top: '60px',
-          containLabel: true,
+  speedChart = echarts.init(speedContainer)
+  speedChart.setOption({
+    title: { text: 'True Wind Speed' },
+    grid: {
+      left: '60px',
+      right: '30px',
+      bottom: '60px',
+      top: '60px',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      name: 'Time',
+      data: [],
+    },
+    yAxis: {
+      type: 'value',
+      name: 'Speed (m/s)',
+    },
+    series: [
+      {
+        name: 'Wind Speed',
+        type: 'line',
+        data: [],
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 4,
+        itemStyle: {
+          color: '#764ba2',
         },
-        xAxis: {
-          type: 'category',
-          name: 'Time',
-          data: [],
+        areaStyle: {
+          color: 'rgba(118, 75, 162, 0.1)',
         },
-        yAxis: {
-          type: 'value',
-          name: 'Speed (m/s)',
-        },
-        series: [
-          {
-            name: 'Wind Speed',
-            type: 'line',
-            data: [],
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 4,
-            itemStyle: {
-              color: '#764ba2',
-            },
-            areaStyle: {
-              color: 'rgba(118, 75, 162, 0.1)',
-            },
-          },
-        ],
-      })
-      console.log('✓ Speed chart initialized')
-    } catch (e) {
-      console.error('Error initializing speed chart:', e)
-    }
-  } else {
-    console.error('wind-speed-chart container not found!')
-  }
+      },
+    ],
+  })
+  console.log('✓ Speed chart initialized')
 
   // Handle window resize
   window.addEventListener('resize', () => {
