@@ -169,10 +169,38 @@ function updateCharts() {
     const avgDirection = directionPoints.length > 0 
       ? directionPoints.reduce((sum, p) => sum + p.direction, 0) / directionPoints.length 
       : 0
+
+    const directionValues = directionPoints.map((p) => p.direction)
+    const minDirection = Math.min(...directionValues)
+    const maxDirection = Math.max(...directionValues)
+    const span = maxDirection - minDirection
+    const padding = Math.max(span * 0.1, 5)
+
+    let axisMin = Math.max(0, Math.floor((minDirection - padding) / 5) * 5)
+    let axisMax = Math.min(360, Math.ceil((maxDirection + padding) / 5) * 5)
+    if (axisMax - axisMin < 10) {
+      axisMin = Math.max(0, axisMin - 5)
+      axisMax = Math.min(360, axisMax + 5)
+    }
     
     console.log('Updating direction chart with', directionPoints.length, 'points, average:', avgDirection.toFixed(1))
     try {
       directionChart.setOption({
+        xAxis: [
+          {
+            min: axisMin,
+            max: axisMax,
+          },
+          {
+            min: Math.floor(axisMin - avgDirection),
+            max: Math.ceil(axisMax - avgDirection),
+            splitLine: {
+              lineStyle: {
+                type: [5,10],
+              },
+            },
+          },
+        ],
         yAxis: {
           data: directionPoints.map((p) => p.time),
           inverse: directionNewestAtTop.value,
@@ -247,21 +275,45 @@ function initCharts() {
     grid: {
       left: "24px",
       right: "16px",
-      bottom: "16px",
-      top: "16px",
+      bottom: "28px",
+      top: "28px",
       containLabel: true,
     },
-    xAxis: {
-      type: 'value',
-      name: 'Direction (deg)',
-      nameLocation: "middle",
-      nameTextStyle: {
-        padding: [0, 0, 8, 0],
+    xAxis: [
+      {
+        type: 'value',
+        name: 'Direction (deg)',
+        nameLocation: "middle",
+        nameTextStyle: {
+          padding: [0, 0, 8, 0],
+        },
+        min: 0,
+        max: 360,
+        position: "top",
       },
-      min: 0,
-      max: 360,
-      position: "top",
-    },
+      {
+        type: 'value',
+        name: 'Offset to Avg (deg)',
+        nameLocation: "middle",
+        nameTextStyle: {
+          padding: [8, 0, 0, 0],
+        },
+        min: -180,
+        max: 180,
+        position: "bottom",
+        axisLabel: {
+          formatter: (value: number) => {
+            if (value == 0) {
+              return '';
+            }
+            if (value > 0) {
+              return `+${value}`
+            }
+            return `${value}`
+          },
+        },
+      },
+    ],
     yAxis: {
       type: 'category',
       name: 'Time',
