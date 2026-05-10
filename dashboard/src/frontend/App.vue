@@ -2,8 +2,35 @@
   <div id="app" class="dashboard">
     <header class="header">
       <h1>🌪️ Wind Dashboard</h1>
+      <button class="settings-btn" @click="pendingTimeFrame = timeFrameMinutes; pendingOldestAtTop = directionOldestAtTop; settingsOpen = true" aria-label="Open settings">⚙</button>
       <div v-if="error" class="error-banner">{{ error }}</div>
     </header>
+
+    <!-- Settings popup -->
+    <div v-if="settingsOpen" class="settings-overlay" @click.self="settingsOpen = false">
+      <div class="settings-panel">
+        <div class="settings-header">
+          <h2>Settings</h2>
+          <button class="settings-close" @click="settingsOpen = false" aria-label="Close settings">✕</button>
+        </div>
+
+        <div class="settings-row">
+          <label for="timeframe-select">Time frame</label>
+          <select id="timeframe-select" v-model.number="pendingTimeFrame">
+            <option v-for="m in [5, 10, 15, 30, 45, 60, 75, 90]" :key="m" :value="m">{{ m }} min</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <label for="dir-order-toggle">Oldest at top</label>
+          <input id="dir-order-toggle" type="checkbox" v-model="pendingOldestAtTop" />
+        </div>
+
+        <div class="settings-footer">
+          <button class="apply-btn" @click="applySettings">Apply</button>
+        </div>
+      </div>
+    </div>
 
     <main v-if="!loading" class="content">
       <div class="kpi-cards">
@@ -62,10 +89,46 @@ const latestMeasurement = ref<Measurement | null>(null)
 const measurements = ref<Measurement[]>([])
 const lastUpdateTime = ref('')
 const chartsReady = ref(false)
-const timeFrameMinutes = ref(30);
+const STORAGE_KEY = 'windDashboardSettings'
+function loadStoredSettings(): { timeFrameMinutes: number; directionOldestAtTop: boolean } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* ignore */ }
+  return { timeFrameMinutes: 30, directionOldestAtTop: false }
+}
+const storedSettings = loadStoredSettings()
+const timeFrameMinutes = ref(storedSettings.timeFrameMinutes)
+const settingsOpen = ref(false)
+const pendingTimeFrame = ref(timeFrameMinutes.value)
+const pendingOldestAtTop = ref(storedSettings.directionOldestAtTop)
 
 // Set to true to render newest direction samples at the bottom.
-const directionOldestAtTop = ref(false)
+const directionOldestAtTop = ref(storedSettings.directionOldestAtTop)
+
+async function applySettings() {
+  timeFrameMinutes.value = pendingTimeFrame.value
+  directionOldestAtTop.value = pendingOldestAtTop.value
+  settingsOpen.value = false
+
+  // Persist to local storage
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    timeFrameMinutes: timeFrameMinutes.value,
+    directionOldestAtTop: directionOldestAtTop.value,
+  }))
+
+  // Dispose existing charts so they reinitialize cleanly
+  chartsReady.value = false
+  directionChart?.dispose()
+  speedChart?.dispose()
+  directionChart = null
+  speedChart = null
+
+  await nextTick()
+  initCharts()
+  chartsReady.value = true
+  await loadMeasurements()
+}
 
 let pb: PocketBase
 let directionChart: echarts.ECharts | null = null
@@ -530,6 +593,7 @@ watch(loading, async (isLoading) => {
 }
 
 .header {
+  position: relative;
   text-align: center;
   color: white;
   margin-bottom: 40px;
@@ -609,6 +673,120 @@ watch(loading, async (isLoading) => {
   padding: 60px 20px;
 }
 
+/* ── Settings ─────────────────────────────────────────── */
+.settings-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-panel {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 32px;
+  min-width: 320px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.settings-header h2 {
+  font-size: 1.3rem;
+  color: #333;
+  margin: 0;
+}
+
+.settings-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #666;
+  line-height: 1;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  gap: 16px;
+}
+
+.settings-row label {
+  font-size: 0.95rem;
+  color: #444;
+  font-weight: 500;
+}
+
+.settings-row select {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.settings-row input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.apply-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 22px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.apply-btn:hover {
+  opacity: 0.88;
+}
+
+/* ── Animations ───────────────────────────────────────── */
 @keyframes fadeIn {
   from {
     opacity: 0;
