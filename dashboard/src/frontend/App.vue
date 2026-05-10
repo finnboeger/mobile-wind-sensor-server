@@ -62,6 +62,7 @@ const latestMeasurement = ref<Measurement | null>(null)
 const measurements = ref<Measurement[]>([])
 const lastUpdateTime = ref('')
 const chartsReady = ref(false)
+const timeFrameMinutes = ref(30);
 
 // Set to false to render newest direction samples at the bottom.
 const directionNewestAtTop = ref(true)
@@ -119,14 +120,18 @@ async function initializePocketBase() {
 
 async function loadMeasurements() {
   try {
-    const records = await pb.collection('measurements').getList<Measurement>(1, 50, {
+    const records = await pb.collection('measurements').getList<Measurement>(1, timeFrameMinutes.value * 60, {
       sort: '-ts',
     })
     console.log('Loaded', records.items.length, 'measurements')
-    measurements.value = records.items
     if (records.items.length > 0) {
-      latestMeasurement.value = records.items[0]
-      console.log('Latest measurement:', latestMeasurement.value)
+      latestMeasurement.value = records.items[0] 
+      console.log('Latest measurement:', {...latestMeasurement.value})
+      measurements.value = records.items.filter(
+        (m) => 
+          new Date(m.ts).getTime() >
+          new Date(latestMeasurement.value?.ts).getTime()
+           - timeFrameMinutes.value * 60 * 1000)
       updateCharts()
       updateTime()
     }
@@ -229,10 +234,11 @@ function initCharts() {
       name: 'Direction (deg)',
       nameLocation: "middle",
       nameTextStyle: {
-        padding: [8, 0, 0, 0],
+        padding: [0, 0, 8, 0],
       },
       min: 0,
       max: 360,
+      position: "top",
     },
     yAxis: {
       type: 'category',
