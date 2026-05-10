@@ -94,7 +94,7 @@ async function initializePocketBase() {
         console.log('Realtime update received:', e.record)
         if (e.record) {
           latestMeasurement.value = e.record
-          measurements.value = [e.record, ...measurements.value].slice(0, 100)
+          measurements.value = [e.record, ...measurements.value].slice(0, timeFrameMinutes.value * 60)
           updateCharts()
           updateTime()
         }
