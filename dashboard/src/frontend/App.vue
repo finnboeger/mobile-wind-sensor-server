@@ -222,8 +222,38 @@ function updateCharts() {
     // Round axis bounds to nearest 5 for clean labels
     axisMin = Math.round(axisMin / 5) * 5
     axisMax = Math.round(axisMax / 5) * 5
-    
-    console.log('Updating direction chart with', normalizedPoints.length, 'points, average:', avgDirection.toFixed(1))
+
+    // Build data arrays with nulls inserted at cutoff crossings
+    const seriesData: Array<[number, number] | [null, null]> = []
+    const eps = 1e-6
+
+    // Build series from normalized values only.
+    // If the normalized gap exceeds 180 deg, force a cutoff break.
+    for (let i = 0; i < normalizedPoints.length; ++i) {
+      const point = normalizedPoints[i]
+      seriesData.push([point.direction, point.timeMs])
+
+      if (i >= normalizedPoints.length - 1) continue
+
+      const nextPoint = normalizedPoints[i + 1]
+      const gap = Math.abs(nextPoint.direction - point.direction)
+      if (gap <= 180) continue
+
+      // Crossing side rule from normalized space:
+      // current < avg => cross left cutoff first, current > avg => cross right cutoff first
+      const crossesLeftFirst = point.direction < avgDirection
+      const beforeCutoff = crossesLeftFirst ? axisMin + eps : axisMax - eps
+      const afterCutoff = crossesLeftFirst ? axisMax - eps : axisMin + eps
+
+      seriesData.push([beforeCutoff, point.timeMs +  0.499])
+
+      seriesData.push([null, null])
+
+      seriesData.push([afterCutoff, point.timeMs +  0.501])
+    }
+
+    // Log using original sample count
+    console.log('Updating direction chart with', directionPoints.length, 'points, average:', avgDirection.toFixed(1))
     try {
       directionChart.setOption({
         xAxis: [
@@ -250,7 +280,7 @@ function updateCharts() {
         },
         series: [
           {
-            data: normalizedPoints.map((p) => p.direction),
+            data: seriesData,
             markLine: {
               symbol: directionOldestAtTop.value ? ['none', 'arrow'] : ['arrow', 'none'],
               data: [
@@ -392,6 +422,10 @@ function initCharts() {
         symbol: 'circle',
         symbolSize: 5,
         showSymbol: false,
+        encode: {
+          x: 0,
+          y: 1,
+        },
         data: [],
         animation: false,
         itemStyle: {
