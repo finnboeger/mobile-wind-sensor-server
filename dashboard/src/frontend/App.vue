@@ -154,7 +154,6 @@ function updateCharts() {
 
   // Wind direction chart (x = direction, y = time)
   const directionPoints = measurements.value
-    .filter((m) => m.true_wind_dir_deg !== null)
     .map((m) => ({
       direction: m.true_wind_dir_deg,
       time: new Date(m.ts).toLocaleTimeString(),
@@ -183,21 +182,22 @@ function updateCharts() {
   }
 
   // Wind speed chart (smoothed with gust)
-  const speedData = measurements.value
-    .filter((m) => m.true_wind_speed_mps !== null)
-    .map((m) => m.true_wind_speed_mps)
-    .reverse()
+  const speedPoints = measurements.value
+    .map((m) => ({
+      speed: m.true_wind_speed_mps,
+      time: new Date(m.ts).toLocaleTimeString(),
+    }))
 
-  if (speedChart && speedData.length > 0) {
-    console.log('Updating speed chart with', speedData.length, 'points, first 3:', speedData.slice(0, 3))
+  if (speedChart && speedPoints.length > 0) {
+    console.log('Updating speed chart with', speedPoints.length, 'points, first 3:', speedPoints.slice(0, 3))
     try {
       speedChart.setOption({
         xAxis: {
-          data: Array.from({ length: speedData.length }, (_, i) => `${i}`),
+          data: speedPoints.map((p) => p.time)
         },
         series: [
           {
-            data: speedData,
+            data: speedPoints.map((p) => p.speed),
           },
         ],
       })
@@ -206,7 +206,7 @@ function updateCharts() {
       console.error('Failed to update speed chart:', e)
     }
   } else {
-    console.log('Speed chart not ready or no data:', !!speedChart, speedData.length)
+    console.log('Speed chart not ready or no data:', !!speedChart, speedPoints.length)
   }
 }
 
@@ -217,25 +217,43 @@ function initCharts() {
   // Wind direction chart
   directionChart = echarts.init(dirContainer)
   directionChart.setOption({
-    title: { text: 'True Wind Direction Over Time' },
     grid: {
-      left: '80px',
-      right: '30px',
-      bottom: '30px',
-      top: '60px',
+      left: "24px",
+      right: "16px",
+      bottom: "16px",
+      top: "16px",
       containLabel: true,
     },
     xAxis: {
       type: 'value',
       name: 'Direction (deg)',
+      nameLocation: "middle",
+      nameTextStyle: {
+        padding: [8, 0, 0, 0],
+      },
       min: 0,
       max: 360,
     },
     yAxis: {
       type: 'category',
       name: 'Time',
+      nameLocation: "middle",
+      nameTextStyle: {
+        padding: [0, 0, 48, 0],
+      },
       data: [],
       inverse: directionNewestAtTop.value,
+      axisLabel: {
+        inside: false,
+        margin: 8,
+        padding: [8, 0, 0, 0],
+      },
+      axisLine: {
+        show: false,
+      },
+      axisTick: {
+        show: false,
+      },
     },
     series: [
       {
@@ -256,22 +274,29 @@ function initCharts() {
   // Wind speed chart
   speedChart = echarts.init(speedContainer)
   speedChart.setOption({
-    title: { text: 'True Wind Speed' },
     grid: {
-      left: '60px',
-      right: '30px',
-      bottom: '60px',
-      top: '60px',
+      left: "24px",
+      right: "16px",
+      bottom: "16px",
+      top: "16px",
       containLabel: true,
     },
     xAxis: {
       type: 'category',
       name: 'Time',
+      nameLocation: "middle",
+      nameTextStyle: {
+        padding: [8, 0, 0, 0],
+      },
       data: [],
     },
     yAxis: {
       type: 'value',
       name: 'Speed (m/s)',
+      nameLocation: "middle",
+      nameTextStyle: {
+        padding: [0, 0, 20, 0],
+      },
     },
     series: [
       {
@@ -284,9 +309,9 @@ function initCharts() {
         itemStyle: {
           color: '#764ba2',
         },
-        areaStyle: {
+        /*areaStyle: {
           color: 'rgba(118, 75, 162, 0.1)',
-        },
+        },*/
       },
     ],
   })
