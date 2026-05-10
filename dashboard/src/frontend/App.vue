@@ -61,6 +61,10 @@ const error = ref('')
 const latestMeasurement = ref<Measurement | null>(null)
 const measurements = ref<Measurement[]>([])
 const lastUpdateTime = ref('')
+const chartsReady = ref(false)
+
+// Set to false to render newest direction samples at the bottom.
+const directionNewestAtTop = ref(true)
 
 let pb: PocketBase
 let directionChart: echarts.ECharts | null = null
@@ -82,6 +86,7 @@ async function initializePocketBase() {
     // Subscribe to real-time updates
     try {
       await pb.collection('measurements').subscribe('*', (e: any) => {
+        console.log('Realtime update received:', e.record)
         if (e.record) {
           latestMeasurement.value = e.record
           measurements.value = [e.record, ...measurements.value].slice(0, 100)
@@ -89,10 +94,11 @@ async function initializePocketBase() {
           updateTime()
         }
       })
+      console.log('✓ Realtime subscription active')
       // Initialize with latest measurements
       await loadMeasurements()
     } catch (e) {
-      console.log('Realtime subscription not available, falling back to polling')
+      console.log('Realtime subscription not available, falling back to polling:', e)
       // Fallback: load latest measurements
       await loadMeasurements()
       // Poll every 5 seconds
@@ -102,6 +108,7 @@ async function initializePocketBase() {
     loading.value = false
   } catch (e) {
     error.value = `Failed to initialize: ${e instanceof Error ? e.message : String(e)}`
+    console.error('Initialization error:', e)
     loading.value = false
   }
 }
@@ -111,9 +118,11 @@ async function loadMeasurements() {
     const records = await pb.collection('measurements').getList<Measurement>(1, 50, {
       sort: '-ts',
     })
+    console.log('Loaded', records.items.length, 'measurements')
     measurements.value = records.items
     if (records.items.length > 0) {
       latestMeasurement.value = records.items[0]
+      console.log('Latest measurement:', latestMeasurement.value)
       updateCharts()
       updateTime()
     }
@@ -130,22 +139,43 @@ function updateTime() {
 }
 
 function updateCharts() {
-  if (measurements.value.length === 0) return
+  if (!chartsReady.value) {
+    return
+  }
 
-  // Wind direction chart (centered polar)
-  const dirData = measurements.value
+  if (measurements.value.length === 0) {
+    console.log('No measurements to chart')
+    return
+  }
+
+  // Wind direction chart (x = direction, y = time)
+  const directionPoints = measurements.value
     .filter((m) => m.true_wind_dir_deg !== null)
-    .map((m) => m.true_wind_dir_deg)
-    .reverse()
+    .map((m) => ({
+      direction: m.true_wind_dir_deg,
+      time: new Date(m.ts).toLocaleTimeString(),
+    }))
 
-  if (directionChart && dirData.length > 0) {
-    directionChart.setOption({
-      series: [
-        {
-          data: dirData.map((angle, idx) => [idx, angle]),
+  if (directionChart && directionPoints.length > 0) {
+    console.log('Updating direction chart with', directionPoints.length, 'points, first:', directionPoints[0])
+    try {
+      directionChart.setOption({
+        yAxis: {
+          data: directionPoints.map((p) => p.time),
+          inverse: directionNewestAtTop.value,
         },
-      ],
-    })
+        series: [
+          {
+            data: directionPoints.map((p) => p.direction),
+          },
+        ],
+      })
+      console.log('✓ Direction chart updated')
+    } catch (e) {
+      console.error('Failed to update direction chart:', e)
+    }
+  } else {
+    console.log('Direction chart not ready or no data:', !!directionChart, directionPoints.length)
   }
 
   // Wind speed chart (smoothed with gust)
@@ -155,16 +185,24 @@ function updateCharts() {
     .reverse()
 
   if (speedChart && speedData.length > 0) {
-    speedChart.setOption({
-      xAxis: {
-        data: Array.from({ length: speedData.length }, (_, i) => i),
-      },
-      series: [
-        {
-          data: speedData,
+    console.log('Updating speed chart with', speedData.length, 'points, first 3:', speedData.slice(0, 3))
+    try {
+      speedChart.setOption({
+        xAxis: {
+          data: Array.from({ length: speedData.length }, (_, i) => `${i}`),
         },
-      ],
-    })
+        series: [
+          {
+            data: speedData,
+          },
+        ],
+      })
+      console.log('✓ Speed chart updated')
+    } catch (e) {
+      console.error('Failed to update speed chart:', e)
+    }
+  } else {
+    console.log('Speed chart not ready or no data:', !!speedChart, speedData.length)
   }
 }
 
@@ -172,56 +210,97 @@ function initCharts() {
   // Wind direction chart
   const dirContainer = document.getElementById('wind-direction-chart')
   if (dirContainer) {
-    directionChart = echarts.init(dirContainer)
-    directionChart.setOption({
-      title: { text: 'True Wind Direction' },
-      polar: {
-        radius: '75%',
-      },
-      angleAxis: {
-        type: 'value',
-        max: 360,
-        splitLine: {
-          show: true,
+    try {
+      directionChart = echarts.init(dirContainer)
+      directionChart.setOption({
+        title: { text: 'True Wind Direction Over Time' },
+        grid: {
+          left: '80px',
+          right: '30px',
+          bottom: '30px',
+          top: '60px',
+          containLabel: true,
         },
-      },
-      radiusAxis: {
-        type: 'value',
-      },
-      series: [
-        {
-          coordinateSystem: 'polar',
-          type: 'scatter',
-          symbolSize: 6,
+        xAxis: {
+          type: 'value',
+          name: 'Direction (deg)',
+          min: 0,
+          max: 360,
+        },
+        yAxis: {
+          type: 'category',
+          name: 'Time',
           data: [],
+          inverse: directionNewestAtTop.value,
         },
-      ],
-    })
+        series: [
+          {
+            name: 'Direction',
+            type: 'line',
+            smooth: false,
+            symbol: 'circle',
+            symbolSize: 5,
+            data: [],
+            itemStyle: {
+              color: '#667eea',
+            },
+          },
+        ],
+      })
+      console.log('✓ Direction chart initialized')
+    } catch (e) {
+      console.error('Error initializing direction chart:', e)
+    }
+  } else {
+    console.error('wind-direction-chart container not found!')
   }
 
   // Wind speed chart
   const speedContainer = document.getElementById('wind-speed-chart')
   if (speedContainer) {
-    speedChart = echarts.init(speedContainer)
-    speedChart.setOption({
-      title: { text: 'True Wind Speed' },
-      xAxis: {
-        type: 'category',
-        data: [],
-      },
-      yAxis: {
-        type: 'value',
-      },
-      series: [
-        {
-          type: 'line',
-          data: [],
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 4,
+    try {
+      speedChart = echarts.init(speedContainer)
+      speedChart.setOption({
+        title: { text: 'True Wind Speed' },
+        grid: {
+          left: '60px',
+          right: '30px',
+          bottom: '60px',
+          top: '60px',
+          containLabel: true,
         },
-      ],
-    })
+        xAxis: {
+          type: 'category',
+          name: 'Time',
+          data: [],
+        },
+        yAxis: {
+          type: 'value',
+          name: 'Speed (m/s)',
+        },
+        series: [
+          {
+            name: 'Wind Speed',
+            type: 'line',
+            data: [],
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 4,
+            itemStyle: {
+              color: '#764ba2',
+            },
+            areaStyle: {
+              color: 'rgba(118, 75, 162, 0.1)',
+            },
+          },
+        ],
+      })
+      console.log('✓ Speed chart initialized')
+    } catch (e) {
+      console.error('Error initializing speed chart:', e)
+    }
+  } else {
+    console.error('wind-speed-chart container not found!')
   }
 
   // Handle window resize
@@ -241,6 +320,8 @@ watch(loading, async (isLoading) => {
     console.log('Content visible, initializing charts...')
     await nextTick()
     initCharts()
+    chartsReady.value = true
+    updateCharts()
   }
 })
 </script>
