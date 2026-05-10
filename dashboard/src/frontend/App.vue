@@ -170,20 +170,28 @@ function updateCharts() {
       ? directionPoints.reduce((sum, p) => sum + p.direction, 0) / directionPoints.length 
       : 0
 
-    const directionValues = directionPoints.map((p) => p.direction)
-    const minDirection = Math.min(...directionValues)
-    const maxDirection = Math.max(...directionValues)
-    const span = maxDirection - minDirection
-    const padding = Math.max(span * 0.1, 5)
+    // Display ±180 degrees centered on average
+    const displaySpan = 180
+    let axisMin = avgDirection - displaySpan
+    let axisMax = avgDirection + displaySpan
 
-    let axisMin = Math.max(0, Math.floor((minDirection - padding) / 5) * 5)
-    let axisMax = Math.min(360, Math.ceil((maxDirection + padding) / 5) * 5)
-    if (axisMax - axisMin < 10) {
-      axisMin = Math.max(0, axisMin - 5)
-      axisMax = Math.min(360, axisMax + 5)
-    }
+    // Normalize data points for display with wrap-around
+    const normalizedPoints = directionPoints.map((p) => {
+      let value = p.direction
+      // Shift points to the correct side of the axis if they wrap
+      if (value < axisMin) {
+        value += 360
+      } else if (value > axisMax) {
+        value -= 360
+      }
+      return { ...p, direction: value }
+    })
+
+    // Round axis bounds to nearest 5 for clean labels
+    axisMin = Math.round(axisMin / 5) * 5
+    axisMax = Math.round(axisMax / 5) * 5
     
-    console.log('Updating direction chart with', directionPoints.length, 'points, average:', avgDirection.toFixed(1))
+    console.log('Updating direction chart with', normalizedPoints.length, 'points, average:', avgDirection.toFixed(1))
     try {
       directionChart.setOption({
         xAxis: [
@@ -202,12 +210,12 @@ function updateCharts() {
           },
         ],
         yAxis: {
-          data: directionPoints.map((p) => p.time),
+          data: normalizedPoints.map((p) => p.time),
           inverse: directionNewestAtTop.value,
         },
         series: [
           {
-            data: directionPoints.map((p) => p.direction),
+            data: normalizedPoints.map((p) => p.direction),
             markLine: {
               data: [
                 {
@@ -290,6 +298,11 @@ function initCharts() {
         min: 0,
         max: 360,
         position: "top",
+        axisLabel: {
+          formatter: (value: number) => {
+            return `${value % 360}`
+          },
+        },
       },
       {
         type: 'value',
