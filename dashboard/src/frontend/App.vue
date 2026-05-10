@@ -120,14 +120,35 @@ async function initializePocketBase() {
 
 async function loadMeasurements() {
   try {
-    const records = await pb.collection('measurements').getList<Measurement>(1, timeFrameMinutes.value * 60, {
-      sort: '-ts',
-    })
-    console.log('Loaded', records.items.length, 'measurements')
-    if (records.items.length > 0) {
-      latestMeasurement.value = records.items[0];
+    const desiredCount = timeFrameMinutes.value * 60
+    const pageSize = Math.min(desiredCount, 1000) // Use smaller page size if requesting fewer than 1000
+    
+    let allRecords: Measurement[] = []
+    let page = 1
+    
+    // Fetch pages until we have enough records or reach the end of data
+    while (allRecords.length < desiredCount) {
+      const records = await pb.collection('measurements').getList<Measurement>(page, pageSize, {
+        sort: '-ts',
+      })
+      allRecords = allRecords.concat(records.items)
+      
+      // If we got fewer items than requested, we've reached the end of data
+      if (records.items.length < pageSize) {
+        break
+      }
+      
+      page++
+    }
+    
+    // Trim to desired count
+    allRecords = allRecords.slice(0, desiredCount)
+    
+    console.log('Loaded', allRecords.length, 'measurements (desired:', desiredCount, ', page size:', pageSize, ')')
+    if (allRecords.length > 0) {
+      latestMeasurement.value = allRecords[0]
       console.log('Latest measurement:', {...latestMeasurement.value})
-      measurements.value = records.items.filter(
+      measurements.value = allRecords.filter(
         (m) => 
           new Date(m.ts).getTime() >
           new Date((latestMeasurement.value ?? fail("unreachable: no latest measurement")).ts).getTime()
