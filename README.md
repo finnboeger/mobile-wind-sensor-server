@@ -97,6 +97,14 @@ See [BARE_METAL_DEPLOYMENT.md](BARE_METAL_DEPLOYMENT.md).
 
 **Note:** LoRaWAN ingestion service will be implemented separately using the lora module.
 
+### Development
+
+1. Start MQTT server: `mosquitto`
+2. Start Database: `./start-pocketbase.sh`
+3. Start MQTT ingestion: `cd mqtt-ingestion && ./scripts/run-local.sh`
+4. Start Dashboard: `cd dashboard && ./scripts/run-local.sh`
+5. Access on http://localhost:5173
+
 ## Project Structure
 
 ```

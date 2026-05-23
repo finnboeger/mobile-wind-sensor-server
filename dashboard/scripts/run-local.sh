@@ -13,4 +13,6 @@ export PORT="${PORT:-3000}"
 export HOST="${HOST:-0.0.0.0}"
 export LOG_LEVEL="${LOG_LEVEL:-info}"
 
-exec npm run dev:backend
+exec npm run dev:backend &
+exec npm run dev:frontend
+fg
