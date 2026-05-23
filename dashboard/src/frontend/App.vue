@@ -229,24 +229,7 @@ function loadStoredSettings(): {
   headingRateThresholdDegs: number;
   avgWindowMinutes: number;
 } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw)
-      return {
-        timeFrameMinutes: 30,
-        windSpeedUnit: "mps",
-        directionOldestAtTop: false,
-        exclusionWindowSec: 5,
-        hideInvalidData: false,
-        accelThresholdMs2: 0.3,
-        headingRateThresholdDegs: 10,
-        avgWindowMinutes: 10,
-        ...JSON.parse(raw),
-      };
-  } catch {
-    /* ignore */
-  }
-  return {
+  const defaultSettings = {
     timeFrameMinutes: 30,
     windSpeedUnit: "mps",
     directionOldestAtTop: false,
@@ -255,7 +238,19 @@ function loadStoredSettings(): {
     accelThresholdMs2: 0.3,
     headingRateThresholdDegs: 10,
     avgWindowMinutes: 10,
-  };
+  } as const;
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw)
+      return {
+        ...defaultSettings,
+        ...JSON.parse(raw),
+      };
+  } catch {
+    /* ignore */
+  }
+  return defaultSettings;
 }
 const storedSettings = loadStoredSettings();
 const timeFrameMinutes = ref(storedSettings.timeFrameMinutes);
