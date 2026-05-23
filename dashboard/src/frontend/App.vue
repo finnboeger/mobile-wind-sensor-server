@@ -5,6 +5,7 @@
         class="settings-btn"
         @click="
           pendingTimeFrame = timeFrameMinutes;
+          pendingWindSpeedUnit = windSpeedUnit;
           pendingOldestAtTop = directionOldestAtTop;
           pendingExclusionWindowSec = exclusionWindowSec;
           pendingHideInvalidData = hideInvalidData;
@@ -48,6 +49,15 @@
             >
               {{ m }} min
             </option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <label for="speed-unit-select">Wind speed unit</label>
+          <select id="speed-unit-select" v-model="pendingWindSpeedUnit">
+            <option value="mps">Meters per second (m/s)</option>
+            <option value="knots">Knots (kn)</option>
+            <option value="kmh">Kilometres per hour (km/h)</option>
           </select>
         </div>
 
@@ -136,9 +146,13 @@
               <div class="label">True Wind Speed</div>
               <div class="value">
                 {{
-                  latestMeasurement?.true_wind_speed_mps?.toFixed(1) || "—"
+                  latestMeasurement
+                    ? convertWindSpeed(latestMeasurement.true_wind_speed_mps).toFixed(
+                        1
+                      )
+                    : "—"
                 }}
-                m/s
+                {{ windSpeedUnitLabel }}
               </div>
             </div>
             <div class="kpi-card">
@@ -151,9 +165,13 @@
               <div class="label">Avg True Wind Speed ({{ avgWindow }})</div>
               <div class="value">
                 {{
-                  averageMeasurement?.true_wind_speed_mps?.toFixed(1) || "—"
+                  averageMeasurement
+                    ? convertWindSpeed(
+                        averageMeasurement.true_wind_speed_mps
+                      ).toFixed(1)
+                    : "—"
                 }}
-                m/s
+                {{ windSpeedUnitLabel }}
               </div>
             </div>
             <div class="kpi-card">
@@ -192,6 +210,8 @@ interface Measurement {
   apparent_wind_speed_mps?: number;
 }
 
+type WindSpeedUnit = "mps" | "knots" | "kmh";
+
 const loading = ref(true);
 const error = ref("");
 const latestMeasurement = ref<Measurement | null>(null);
@@ -201,6 +221,7 @@ const chartsReady = ref(false);
 const STORAGE_KEY = "windDashboardSettings";
 function loadStoredSettings(): {
   timeFrameMinutes: number;
+  windSpeedUnit: WindSpeedUnit;
   directionOldestAtTop: boolean;
   exclusionWindowSec: number;
   hideInvalidData: boolean;
@@ -213,6 +234,7 @@ function loadStoredSettings(): {
     if (raw)
       return {
         timeFrameMinutes: 30,
+        windSpeedUnit: "mps",
         directionOldestAtTop: false,
         exclusionWindowSec: 5,
         hideInvalidData: false,
@@ -226,6 +248,7 @@ function loadStoredSettings(): {
   }
   return {
     timeFrameMinutes: 30,
+    windSpeedUnit: "mps",
     directionOldestAtTop: false,
     exclusionWindowSec: 5,
     hideInvalidData: false,
@@ -238,6 +261,7 @@ const storedSettings = loadStoredSettings();
 const timeFrameMinutes = ref(storedSettings.timeFrameMinutes);
 const settingsOpen = ref(false);
 const pendingTimeFrame = ref(timeFrameMinutes.value);
+const pendingWindSpeedUnit = ref<WindSpeedUnit>(storedSettings.windSpeedUnit);
 const pendingOldestAtTop = ref(storedSettings.directionOldestAtTop);
 const pendingExclusionWindowSec = ref(storedSettings.exclusionWindowSec);
 const pendingHideInvalidData = ref(storedSettings.hideInvalidData);
@@ -248,12 +272,25 @@ const pendingHeadingRateThresholdDegs = ref(
 const pendingAvgWindowMinutes = ref(storedSettings.avgWindowMinutes);
 
 // Set to true to render newest direction samples at the bottom.
+const windSpeedUnit = ref<WindSpeedUnit>(storedSettings.windSpeedUnit);
 const directionOldestAtTop = ref(storedSettings.directionOldestAtTop);
 const exclusionWindowSec = ref(storedSettings.exclusionWindowSec);
 const hideInvalidData = ref(storedSettings.hideInvalidData);
 const accelThresholdMs2 = ref(storedSettings.accelThresholdMs2);
 const headingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs);
 const avgWindowMinutes = ref(storedSettings.avgWindowMinutes);
+
+const windSpeedUnitLabel = computed(() => {
+  if (windSpeedUnit.value === "knots") return "kn";
+  if (windSpeedUnit.value === "kmh") return "km/h";
+  return "m/s";
+});
+
+function convertWindSpeed(speedMps: number): number {
+  if (windSpeedUnit.value === "knots") return speedMps * 1.943844;
+  if (windSpeedUnit.value === "kmh") return speedMps * 3.6;
+  return speedMps;
+}
 
 // Human-readable label shown in the KPI cards
 const avgWindow = computed(() => `${avgWindowMinutes.value} min`);
@@ -332,6 +369,7 @@ function computeUnreliableRanges(
 
 async function applySettings() {
   timeFrameMinutes.value = pendingTimeFrame.value;
+  windSpeedUnit.value = pendingWindSpeedUnit.value;
   directionOldestAtTop.value = pendingOldestAtTop.value;
   exclusionWindowSec.value = pendingExclusionWindowSec.value;
   hideInvalidData.value = pendingHideInvalidData.value;
@@ -345,6 +383,7 @@ async function applySettings() {
     STORAGE_KEY,
     JSON.stringify({
       timeFrameMinutes: timeFrameMinutes.value,
+      windSpeedUnit: windSpeedUnit.value,
       directionOldestAtTop: directionOldestAtTop.value,
       exclusionWindowSec: exclusionWindowSec.value,
       hideInvalidData: hideInvalidData.value,
@@ -729,7 +768,7 @@ function updateCharts() {
 
   // Wind speed chart (smoothed with gust)
   const speedPoints = measurements.value.map((m) => ({
-    speed: m.true_wind_speed_mps,
+    speed: convertWindSpeed(m.true_wind_speed_mps),
     time: new Date(m.ts).toLocaleTimeString(),
   }));
 
@@ -747,6 +786,9 @@ function updateCharts() {
         animationDurationUpdate: 0,
         xAxis: {
           data: speedPoints.map((p) => p.time),
+        },
+        yAxis: {
+          name: `Speed (${windSpeedUnitLabel.value})`,
         },
         series: [
           {
@@ -909,7 +951,7 @@ function initCharts() {
     },
     yAxis: {
       type: "value",
-      name: "Speed (m/s)",
+      name: `Speed (${windSpeedUnitLabel.value})`,
       nameLocation: "middle",
       nameTextStyle: {
         padding: [0, 0, 12, 0],
