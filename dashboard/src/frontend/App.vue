@@ -319,6 +319,9 @@ function updateCharts() {
     console.log('Updating direction chart with', directionPoints.length, 'points, average:', avgDirection.toFixed(1))
     try {
       directionChart.setOption({
+        animation: false,
+        animationDuration: 0,
+        animationDurationUpdate: 0,
         xAxis: [
           {
             min: axisMin,
@@ -384,6 +387,9 @@ function updateCharts() {
     console.log('Updating speed chart with', speedPoints.length, 'points, first 3:', speedPoints.slice(0, 3))
     try {
       speedChart.setOption({
+        animation: false,
+        animationDuration: 0,
+        animationDurationUpdate: 0,
         xAxis: {
           data: speedPoints.map((p) => p.time)
         },
@@ -409,6 +415,9 @@ function initCharts() {
   // Wind direction chart
   directionChart = echarts.init(dirContainer)
   directionChart.setOption({
+    animation: false,
+    animationDuration: 0,
+    animationDurationUpdate: 0,
     grid: {
       left: "24px",
       right: "16px",
@@ -502,6 +511,9 @@ function initCharts() {
   // Wind speed chart
   speedChart = echarts.init(speedContainer)
   speedChart.setOption({
+    animation: false,
+    animationDuration: 0,
+    animationDurationUpdate: 0,
     grid: {
       left: "24px",
       right: "16px",
