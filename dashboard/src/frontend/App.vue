@@ -1,8 +1,7 @@
 <template>
   <div id="app" class="dashboard">
     <header class="header">
-      <h1>🌪️ Wind Dashboard</h1>
-      <button class="settings-btn" @click="pendingTimeFrame = timeFrameMinutes; pendingOldestAtTop = directionOldestAtTop; settingsOpen = true" aria-label="Open settings">⚙</button>
+      <button class="settings-btn" @click="pendingTimeFrame = timeFrameMinutes; pendingOldestAtTop = directionOldestAtTop; pendingExclusionWindowSec = exclusionWindowSec; pendingHideInvalidData = hideInvalidData; pendingAccelThresholdMs2 = accelThresholdMs2; pendingHeadingRateThresholdDegs = headingRateThresholdDegs; settingsOpen = true" aria-label="Open settings">⚙</button>
       <div v-if="error" class="error-banner">{{ error }}</div>
     </header>
 
@@ -24,6 +23,29 @@
         <div class="settings-row">
           <label for="dir-order-toggle">Oldest at top</label>
           <input id="dir-order-toggle" type="checkbox" v-model="pendingOldestAtTop" />
+        </div>
+
+        <div class="settings-row">
+          <label for="exclusion-window-select">Exclusion window</label>
+          <select id="exclusion-window-select" v-model.number="pendingExclusionWindowSec">
+            <option :value="0">Off</option>
+            <option v-for="s in [2, 5, 10, 15, 20, 30]" :key="s" :value="s">{{ s }} s</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <label for="hide-invalid-toggle">Hide invalid data</label>
+          <input id="hide-invalid-toggle" type="checkbox" v-model="pendingHideInvalidData" />
+        </div>
+
+        <div class="settings-row">
+          <label for="accel-threshold-input">Accel threshold (m/s²)</label>
+          <input id="accel-threshold-input" type="number" min="0" step="0.05" v-model.number="pendingAccelThresholdMs2" />
+        </div>
+
+        <div class="settings-row">
+          <label for="heading-threshold-input">Heading rate threshold (°/s)</label>
+          <input id="heading-threshold-input" type="number" min="0" step="0.5" v-model.number="pendingHeadingRateThresholdDegs" />
         </div>
 
         <div class="settings-footer">
@@ -90,31 +112,80 @@ const measurements = ref<Measurement[]>([])
 const lastUpdateTime = ref('')
 const chartsReady = ref(false)
 const STORAGE_KEY = 'windDashboardSettings'
-function loadStoredSettings(): { timeFrameMinutes: number; directionOldestAtTop: boolean } {
+function loadStoredSettings(): { timeFrameMinutes: number; directionOldestAtTop: boolean; exclusionWindowSec: number; hideInvalidData: boolean; accelThresholdMs2: number; headingRateThresholdDegs: number } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) return { timeFrameMinutes: 30, directionOldestAtTop: false, exclusionWindowSec: 5, hideInvalidData: false, accelThresholdMs2: 0.3, headingRateThresholdDegs: 10, ...JSON.parse(raw) }
   } catch { /* ignore */ }
-  return { timeFrameMinutes: 30, directionOldestAtTop: false }
+  return { timeFrameMinutes: 30, directionOldestAtTop: false, exclusionWindowSec: 5, hideInvalidData: false, accelThresholdMs2: 0.3, headingRateThresholdDegs: 10 }
 }
 const storedSettings = loadStoredSettings()
 const timeFrameMinutes = ref(storedSettings.timeFrameMinutes)
 const settingsOpen = ref(false)
 const pendingTimeFrame = ref(timeFrameMinutes.value)
 const pendingOldestAtTop = ref(storedSettings.directionOldestAtTop)
+const pendingExclusionWindowSec = ref(storedSettings.exclusionWindowSec)
+const pendingHideInvalidData = ref(storedSettings.hideInvalidData)
+const pendingAccelThresholdMs2 = ref(storedSettings.accelThresholdMs2)
+const pendingHeadingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs)
 
 // Set to true to render newest direction samples at the bottom.
 const directionOldestAtTop = ref(storedSettings.directionOldestAtTop)
+const exclusionWindowSec = ref(storedSettings.exclusionWindowSec)
+const hideInvalidData = ref(storedSettings.hideInvalidData)
+const accelThresholdMs2 = ref(storedSettings.accelThresholdMs2)
+const headingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs)
+
+// Detect sensor acceleration / heading-rate events and return merged unreliable time ranges.
+function computeUnreliableRanges(meas: Measurement[], windowMs: number): Array<[number, number]> {
+  if (windowMs <= 0) return []
+  const eventTimes: number[] = []
+  for (let i = 0; i < meas.length - 1; i++) {
+    const a = meas[i]
+    const b = meas[i + 1]
+    const dtMs = Math.abs(new Date(a.ts).getTime() - new Date(b.ts).getTime())
+    if (dtMs === 0) continue
+    const dtS = dtMs / 1000
+    const midTime = (new Date(a.ts).getTime() + new Date(b.ts).getTime()) / 2
+    if (a.sensor_speed_mps != null && b.sensor_speed_mps != null) {
+      if (Math.abs(a.sensor_speed_mps - b.sensor_speed_mps) / dtS > accelThresholdMs2.value)
+        eventTimes.push(midTime)
+    }
+    if (a.sensor_heading_deg != null && b.sensor_heading_deg != null) {
+      let dh = Math.abs(a.sensor_heading_deg - b.sensor_heading_deg)
+      if (dh > 180) dh = 360 - dh
+      if (dh / dtS > headingRateThresholdDegs.value) eventTimes.push(midTime)
+    }
+  }
+  const raw = eventTimes.map(t => [t - windowMs, t + windowMs] as [number, number])
+  raw.sort((a, b) => a[0] - b[0])
+  const merged: Array<[number, number]> = []
+  for (const r of raw) {
+    if (merged.length > 0 && r[0] <= merged[merged.length - 1][1])
+      merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], r[1])
+    else
+      merged.push([...r] as [number, number])
+  }
+  return merged
+}
 
 async function applySettings() {
   timeFrameMinutes.value = pendingTimeFrame.value
   directionOldestAtTop.value = pendingOldestAtTop.value
+  exclusionWindowSec.value = pendingExclusionWindowSec.value
+  hideInvalidData.value = pendingHideInvalidData.value
+  accelThresholdMs2.value = pendingAccelThresholdMs2.value
+  headingRateThresholdDegs.value = pendingHeadingRateThresholdDegs.value
   settingsOpen.value = false
 
   // Persist to local storage
   localStorage.setItem(STORAGE_KEY, JSON.stringify({
     timeFrameMinutes: timeFrameMinutes.value,
     directionOldestAtTop: directionOldestAtTop.value,
+    exclusionWindowSec: exclusionWindowSec.value,
+    hideInvalidData: hideInvalidData.value,
+    accelThresholdMs2: accelThresholdMs2.value,
+    headingRateThresholdDegs: headingRateThresholdDegs.value,
   }))
 
   // Dispose existing charts so they reinitialize cleanly
@@ -286,15 +357,68 @@ function updateCharts() {
     axisMin = Math.round(axisMin / 5) * 5
     axisMax = Math.round(axisMax / 5) * 5
 
-    // Build data arrays with nulls inserted at cutoff crossings
-    const seriesData: Array<[number, number] | [null, null]> = []
+    // Build two data arrays:
+    // - reliableSeriesData: solid line
+    // - excludedSeriesData: dashed line for ignored windows
+    const reliableSeriesData: Array<[number, number] | [null, null]> = []
+    const excludedSeriesData: Array<[number, number] | [null, null]> = []
     const eps = 1e-6
+    const unreliableRanges = computeUnreliableRanges(measurements.value, exclusionWindowSec.value * 1000)
+
+    function isUnreliable(timeMs: number): boolean {
+      for (const [start, end] of unreliableRanges) {
+        if (timeMs >= start && timeMs <= end) return true
+      }
+      return false
+    }
+
+    function pushPoint(direction: number, timeMs: number, unreliable: boolean): void {
+      if (unreliable) {
+        reliableSeriesData.push([null, null])
+        excludedSeriesData.push([direction, timeMs])
+      } else {
+        reliableSeriesData.push([direction, timeMs])
+        excludedSeriesData.push([null, null])
+      }
+    }
+
+    // Keep track of the last appended sample so dashed segments can include
+    // copied valid endpoints at reliability transitions.
+    let hasLastSample = false
+    let lastDirection = 0
+    let lastTimeMs = 0
+    let lastUnreliable = false
+
+    function appendSample(direction: number, timeMs: number, unreliable: boolean): void {
+      if (hasLastSample && lastUnreliable !== unreliable) {
+        if (unreliable) {
+          // Entering excluded region: copy the last reliable point into dashed series.
+          pushPoint(lastDirection, lastTimeMs, true)
+        } else {
+          // Leaving excluded region: copy the current reliable point into dashed series.
+          pushPoint(direction, timeMs, true)
+        }
+      }
+
+      pushPoint(direction, timeMs, unreliable)
+      hasLastSample = true
+      lastDirection = direction
+      lastTimeMs = timeMs
+      lastUnreliable = unreliable
+    }
+
+    function pushBreak(): void {
+      reliableSeriesData.push([null, null])
+      excludedSeriesData.push([null, null])
+      hasLastSample = false
+    }
 
     // Build series from normalized values only.
     // If the normalized gap exceeds 180 deg, force a cutoff break.
     for (let i = 0; i < normalizedPoints.length; ++i) {
       const point = normalizedPoints[i]
-      seriesData.push([point.direction, point.timeMs])
+      const pointUnreliable = isUnreliable(point.timeMs)
+      appendSample(point.direction, point.timeMs, pointUnreliable)
 
       if (i >= normalizedPoints.length - 1) continue
 
@@ -307,12 +431,14 @@ function updateCharts() {
       const crossesLeftFirst = point.direction < avgDirection
       const beforeCutoff = crossesLeftFirst ? axisMin + eps : axisMax - eps
       const afterCutoff = crossesLeftFirst ? axisMax - eps : axisMin + eps
+      const cutTimeBefore = point.timeMs + 0.499
+      const cutTimeAfter = point.timeMs + 0.501
+      const beforeUnreliable = isUnreliable(cutTimeBefore)
+      const afterUnreliable = isUnreliable(cutTimeAfter)
 
-      seriesData.push([beforeCutoff, point.timeMs +  0.499])
-
-      seriesData.push([null, null])
-
-      seriesData.push([afterCutoff, point.timeMs +  0.501])
+      appendSample(beforeCutoff, cutTimeBefore, beforeUnreliable)
+      pushBreak()
+      appendSample(afterCutoff, cutTimeAfter, afterUnreliable)
     }
 
     // Log using original sample count
@@ -346,7 +472,8 @@ function updateCharts() {
         },
         series: [
           {
-            data: seriesData,
+            name: 'Direction (Reliable)',
+            data: reliableSeriesData,
             markLine: {
               symbol: directionOldestAtTop.value ? ['none', 'arrow'] : ['arrow', 'none'],
               data: [
@@ -364,6 +491,17 @@ function updateCharts() {
                   },
                 },
               ],
+            },
+          },
+          {
+            name: 'Direction (Excluded)',
+            show: !hideInvalidData.value,
+            data: hideInvalidData.value ? [] : excludedSeriesData,
+            lineStyle: {
+              type: 'dashed',
+              width: 2,
+              color: '#667eea',
+              opacity: 0.9,
             },
           },
         ],
@@ -488,20 +626,32 @@ function initCharts() {
     },
     series: [
       {
-        name: 'Direction',
+        name: 'Direction (Reliable)',
         type: 'line',
         smooth: false,
         symbol: 'circle',
         symbolSize: 5,
         showSymbol: false,
-        encode: {
-          x: 0,
-          y: 1,
-        },
+        encode: { x: 0, y: 1 },
         data: [],
         animation: false,
-        itemStyle: {
+        itemStyle: { color: '#667eea' },
+      },
+      {
+        name: 'Direction (Excluded)',
+        type: 'line',
+        smooth: false,
+        symbol: 'circle',
+        symbolSize: 5,
+        showSymbol: false,
+        encode: { x: 0, y: 1 },
+        data: [],
+        animation: false,
+        lineStyle: {
+          type: 'dashed',
+          width: 2,
           color: '#667eea',
+          opacity: 0.9,
         },
       },
     ],
