@@ -10,6 +10,7 @@
           pendingHideInvalidData = hideInvalidData;
           pendingAccelThresholdMs2 = accelThresholdMs2;
           pendingHeadingRateThresholdDegs = headingRateThresholdDegs;
+          pendingAvgWindowMinutes = avgWindowMinutes;
           settingsOpen = true;
         "
         aria-label="Open settings"
@@ -105,6 +106,22 @@
           />
         </div>
 
+        <div class="settings-row">
+          <label for="avg-window-select">Average window</label>
+          <select
+            id="avg-window-select"
+            v-model.number="pendingAvgWindowMinutes"
+          >
+            <option
+              v-for="m in [5, 10, 15, 30, 45, 60]"
+              :key="m"
+              :value="m"
+            >
+              {{ m }} min
+            </option>
+          </select>
+        </div>
+
         <div class="settings-footer">
           <button class="apply-btn" @click="applySettings">Apply</button>
         </div>
@@ -112,34 +129,41 @@
     </div>
 
     <main v-if="!loading" class="content">
-      <div class="kpi-cards">
-        <div class="kpi-card">
-          <div class="label">True Wind Speed</div>
-          <div class="value">
-            {{ latestMeasurement?.true_wind_speed_mps?.toFixed(1) || "—" }} m/s
-          </div>
-        </div>
-        <div class="kpi-card">
-          <div class="label">True Wind Direction</div>
-          <div class="value">
-            {{ latestMeasurement?.true_wind_dir_deg?.toFixed(0) || "—" }}°
-          </div>
-        </div>
-        <div class="kpi-card">
-          <div class="label">Sensor Heading</div>
-          <div class="value">
-            {{ latestMeasurement?.sensor_heading_deg?.toFixed(0) || "—" }}°
-          </div>
-        </div>
-        <div class="kpi-card">
-          <div class="label">Last Update</div>
-          <div class="value">{{ lastUpdateTime }}</div>
-        </div>
-      </div>
-
       <div class="charts">
+        <div class="left-column">
+          <div class="kpi-cards">
+            <div class="kpi-card">
+              <div class="label">True Wind Speed</div>
+              <div class="value">
+                {{
+                  latestMeasurement?.true_wind_speed_mps?.toFixed(1) || "—"
+                }}
+                m/s
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">True Wind Direction</div>
+              <div class="value">
+                {{ latestMeasurement?.true_wind_dir_deg?.toFixed(0) || "—" }}°
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">Avg True Wind Speed ({{ avgWindow }})</div>
+              <div class="value">
+                {{
+                  averageMeasurement?.true_wind_speed_mps?.toFixed(1) || "—"
+                }}
+                m/s
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="label">Avg True Wind Direction ({{ avgWindow }})</div>
+              <div class="value">{{ averageMeasurement?.true_wind_dir_deg?.toFixed(0) || "—" }}°</div>
+            </div>
+          </div>
+          <div id="wind-speed-chart" class="chart-container"></div>
+        </div>
         <div id="wind-direction-chart" class="chart-container"></div>
-        <div id="wind-speed-chart" class="chart-container"></div>
       </div>
     </main>
 
@@ -150,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import PocketBase from "pocketbase";
 import * as echarts from "echarts";
 
@@ -182,6 +206,7 @@ function loadStoredSettings(): {
   hideInvalidData: boolean;
   accelThresholdMs2: number;
   headingRateThresholdDegs: number;
+  avgWindowMinutes: number;
 } {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -193,6 +218,7 @@ function loadStoredSettings(): {
         hideInvalidData: false,
         accelThresholdMs2: 0.3,
         headingRateThresholdDegs: 10,
+        avgWindowMinutes: 10,
         ...JSON.parse(raw),
       };
   } catch {
@@ -205,6 +231,7 @@ function loadStoredSettings(): {
     hideInvalidData: false,
     accelThresholdMs2: 0.3,
     headingRateThresholdDegs: 10,
+    avgWindowMinutes: 10,
   };
 }
 const storedSettings = loadStoredSettings();
@@ -218,6 +245,7 @@ const pendingAccelThresholdMs2 = ref(storedSettings.accelThresholdMs2);
 const pendingHeadingRateThresholdDegs = ref(
   storedSettings.headingRateThresholdDegs
 );
+const pendingAvgWindowMinutes = ref(storedSettings.avgWindowMinutes);
 
 // Set to true to render newest direction samples at the bottom.
 const directionOldestAtTop = ref(storedSettings.directionOldestAtTop);
@@ -225,6 +253,39 @@ const exclusionWindowSec = ref(storedSettings.exclusionWindowSec);
 const hideInvalidData = ref(storedSettings.hideInvalidData);
 const accelThresholdMs2 = ref(storedSettings.accelThresholdMs2);
 const headingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs);
+const avgWindowMinutes = ref(storedSettings.avgWindowMinutes);
+
+// Human-readable label shown in the KPI cards
+const avgWindow = computed(() => `${avgWindowMinutes.value} min`);
+
+// Average of true_wind_dir_deg and true_wind_speed_mps over the last avgWindowMinutes
+const averageMeasurement = computed(() => {
+  if (!latestMeasurement.value || measurements.value.length === 0) return null;
+  const cutoff =
+    new Date(latestMeasurement.value.ts).getTime() -
+    avgWindowMinutes.value * 60 * 1000;
+  const window = measurements.value.filter(
+    (m) => new Date(m.ts).getTime() >= cutoff
+  );
+  if (window.length === 0) return null;
+  const avgSpeed =
+    window.reduce((s, m) => s + m.true_wind_speed_mps, 0) / window.length;
+  // Circular mean for direction
+  const sinSum = window.reduce(
+    (s, m) => s + Math.sin((m.true_wind_dir_deg * Math.PI) / 180),
+    0
+  );
+  const cosSum = window.reduce(
+    (s, m) => s + Math.cos((m.true_wind_dir_deg * Math.PI) / 180),
+    0
+  );
+  const avgDir =
+    ((Math.atan2(sinSum / window.length, cosSum / window.length) * 180) /
+      Math.PI +
+      360) %
+    360;
+  return { true_wind_speed_mps: avgSpeed, true_wind_dir_deg: avgDir };
+});
 
 // Detect sensor acceleration / heading-rate events and return merged unreliable time ranges.
 function computeUnreliableRanges(
@@ -276,6 +337,7 @@ async function applySettings() {
   hideInvalidData.value = pendingHideInvalidData.value;
   accelThresholdMs2.value = pendingAccelThresholdMs2.value;
   headingRateThresholdDegs.value = pendingHeadingRateThresholdDegs.value;
+  avgWindowMinutes.value = pendingAvgWindowMinutes.value;
   settingsOpen.value = false;
 
   // Persist to local storage
@@ -288,6 +350,7 @@ async function applySettings() {
       hideInvalidData: hideInvalidData.value,
       accelThresholdMs2: accelThresholdMs2.value,
       headingRateThresholdDegs: headingRateThresholdDegs.value,
+      avgWindowMinutes: avgWindowMinutes.value,
     })
   );
 
@@ -981,9 +1044,12 @@ watch(loading, async (isLoading) => {
   gap: 20px;
 }
 
-#wind-speed-chart {
-  max-height: 500px;
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
+
 
 .chart-container {
   background: rgba(255, 255, 255, 0.95);
@@ -991,6 +1057,7 @@ watch(loading, async (isLoading) => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   min-height: 500px;
   padding: 20px;
+  flex-grow: 1;
 }
 
 .loading {
