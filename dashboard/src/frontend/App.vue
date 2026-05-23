@@ -734,31 +734,26 @@ watch(loading, async (isLoading) => {
 })
 </script>
 
-<style scoped>
+<style>
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
+</style>
 
+<style scoped>
 #app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
     Ubuntu, Cantarell, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
   padding: 20px;
-}
-
-.dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .header {
   position: relative;
-  text-align: center;
-  color: white;
-  margin-bottom: 40px;
 }
 
 .header h1 {
@@ -776,13 +771,16 @@ watch(loading, async (isLoading) => {
 
 .content {
   animation: fadeIn 0.5s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  flex-grow: 1;
 }
 
 .kpi-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 20px;
-  margin-bottom: 40px;
 }
 
 .kpi-card {
@@ -816,15 +814,20 @@ watch(loading, async (isLoading) => {
 
 .charts {
   display: grid;
+  flex-grow: 1;
   grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
   gap: 20px;
+}
+
+#wind-speed-chart {
+  max-height: 500px;
 }
 
 .chart-container {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  height: 500px;
+  min-height: 500px;
   padding: 20px;
 }
 
@@ -838,16 +841,17 @@ watch(loading, async (isLoading) => {
 /* ── Settings ─────────────────────────────────────────── */
 .settings-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 0px;
+  right: 0px;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.2);
   border: none;
   border-radius: 50%;
   width: 44px;
   height: 44px;
-  font-size: 1.4rem;
+  font-size: 44px;
   cursor: pointer;
-  color: white;
+  color: black;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -933,7 +937,7 @@ watch(loading, async (isLoading) => {
 }
 
 .apply-btn {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: #667eea;
   color: white;
   border: none;
   border-radius: 8px;
