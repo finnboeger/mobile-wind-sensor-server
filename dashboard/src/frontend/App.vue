@@ -244,7 +244,7 @@ function loadStoredSettings(): {
 } {
   const defaultSettings = {
     timeFrameMinutes: 30,
-    windSpeedUnit: "mps",
+    windSpeedUnit: "knots",
     directionOldestAtTop: false,
     exclusionWindowSec: 5,
     hideInvalidData: false,
