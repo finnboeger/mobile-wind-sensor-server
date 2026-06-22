@@ -6,6 +6,7 @@ Subscribes to MQTT topics and writes validated measurements to PocketBase
 import json
 import logging
 from datetime import datetime, timezone
+from ssl import PROTOCOL_TLS
 from typing import Optional
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
@@ -25,15 +26,18 @@ class MqttListener:
         self.stats = {"messages_received": 0, "messages_processed": 0, "messages_failed": 0}
 
     def connect(self) -> None:
-        """Connect to MQTT broker and authenticate with PocketBase"""
-        # Authenticate with PocketBase first
-        self._authenticate()
-
-        self.client = mqtt.Client(CallbackAPIVersion.VERSION2)
+        """Connect to MQTT broker"""
+        
+        self.client = mqtt.Client(
+            callback_api_version=CallbackAPIVersion.VERSION2,
+            client_id="server_listener",
+            userdata=None,
+            protocol=mqtt.MQTTv5,
+        )
+        self.client.tls_set(tls_version=PROTOCOL_TLS)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
-
         if self.mqtt_config.mqtt_user and self.mqtt_config.mqtt_password:
             self.client.username_pw_set(self.mqtt_config.mqtt_user, self.mqtt_config.mqtt_password)
 
