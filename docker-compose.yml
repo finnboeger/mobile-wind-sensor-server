@@ -41,7 +41,7 @@ services:
       # PocketBase configuration
       POCKETBASE_URL: http://pocketbase:8090
       POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-admin@example.com}
-      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-admin}
+      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-adminadmin}
 
       # UI defaults
       DEFAULT_TIMEFRAME_MINUTES: ${DEFAULT_TIMEFRAME_MINUTES:-15}
@@ -83,7 +83,7 @@ services:
       # PocketBase configuration
       POCKETBASE_URL: http://pocketbase:8090
       POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-admin@example.com}
-      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-admin}
+      POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-adminadmin}
 
       # Service configuration
       LOG_LEVEL: ${LOG_LEVEL:-info}
