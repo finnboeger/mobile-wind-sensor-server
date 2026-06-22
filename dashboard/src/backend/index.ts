@@ -40,7 +40,7 @@ async function main() {
     app.use(express.json());
 
     // Serve static Vue frontend
-    const frontendDir = path.join(__dirname, "../../dist/public");
+    const frontendDir = path.join(__dirname, "./public");
     app.use(express.static(frontendDir));
 
     // API endpoints
