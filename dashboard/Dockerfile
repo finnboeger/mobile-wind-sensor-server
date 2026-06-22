@@ -1,30 +1,22 @@
-# Multi-stage build: frontend (build stage) + backend (runtime)
-
-# Stage 1: Build Vue frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-COPY package.json ./
+# Install all deps (including dev) needed for TypeScript + Vite build.
+COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
 RUN npm run build:frontend
-
-# Stage 2: Build and run backend
-FROM node:20-alpine
-
-WORKDIR /app
-
-COPY package.json ./
-RUN npm ci --only=production
-
-COPY src/backend ./src/backend
-COPY tsconfig.json .
-
 RUN npm run build:backend
 
-# Copy built frontend from stage 1
-COPY --from=frontend-builder /app/dist/public ./dist/public
+FROM node:20-alpine AS runtime
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Backend JS output + frontend assets
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 
