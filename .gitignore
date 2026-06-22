@@ -55,3 +55,4 @@ htmlcov/
 .dmypy.json
 dmypy.json
 .pyre/
+*.tar.gz
