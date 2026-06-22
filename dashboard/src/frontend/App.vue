@@ -564,10 +564,24 @@ function updateCharts() {
   }));
 
   if (directionChart && directionPoints.length > 0) {
-    // Calculate average wind direction
-    const avgDirection = directionPoints.length > 0 ?
-      averageDirection(directionPoints.map((dp) => dp.direction))
-      : 0;
+    // Compute unreliable ranges first
+    const unreliableRanges = computeUnreliableRanges(
+      measurements.value,
+      exclusionWindowSec.value * 1000
+    );
+
+    // Filter out unreliable points for average calculation
+    const reliableDirectionPoints = directionPoints.filter((p) => {
+      for (const [start, end] of unreliableRanges) {
+        if (p.timeMs >= start && p.timeMs <= end) return false;
+      }
+      return true;
+    });
+
+    // Calculate average wind direction (excluding unreliable samples)
+    const avgDirection = reliableDirectionPoints.length > 0 ?
+      averageDirection(reliableDirectionPoints.map((dp) => dp.direction))
+      : directionPoints.length > 0 ? averageDirection(directionPoints.map((dp) => dp.direction)) : 0;
 
     // Compute displaySpan based on largest distance from average
     let maxDistance = 0;
@@ -607,10 +621,6 @@ function updateCharts() {
     const reliableSeriesData: Array<[number, number] | [null, null]> = [];
     const excludedSeriesData: Array<[number, number] | [null, null]> = [];
     const eps = 1e-6;
-    const unreliableRanges = computeUnreliableRanges(
-      measurements.value,
-      exclusionWindowSec.value * 1000
-    );
 
     function isUnreliable(timeMs: number): boolean {
       for (const [start, end] of unreliableRanges) {
