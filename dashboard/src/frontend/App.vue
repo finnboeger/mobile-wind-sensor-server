@@ -316,9 +316,27 @@ const averageMeasurement = computed(() => {
     (m) => new Date(m.ts).getTime() >= cutoff
   );
   if (window.length === 0) return null;
+
+  const unreliableRanges = computeUnreliableRanges(
+    window,
+    exclusionWindowSec.value * 1000
+  );
+  const reliableWindow = window.filter((m) => {
+    const ts = new Date(m.ts).getTime();
+    for (const [start, end] of unreliableRanges) {
+      if (ts >= start && ts <= end) return false;
+    }
+    return true;
+  });
+
+  if (reliableWindow.length === 0) return null;
+
   const avgSpeed =
-    window.reduce((s, m) => s + m.true_wind_speed_mps, 0) / window.length;
-  const avgDir = averageDirection(window.map((m) => m.true_wind_dir_deg));
+    reliableWindow.reduce((s, m) => s + m.true_wind_speed_mps, 0) /
+    reliableWindow.length;
+  const avgDir = averageDirection(
+    reliableWindow.map((m) => m.true_wind_dir_deg)
+  );
   return { true_wind_speed_mps: avgSpeed, true_wind_dir_deg: avgDir };
 });
 
