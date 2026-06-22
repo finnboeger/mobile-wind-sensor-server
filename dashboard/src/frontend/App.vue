@@ -290,6 +290,22 @@ function convertWindSpeed(speedMps: number): number {
 // Human-readable label shown in the KPI cards
 const avgWindow = computed(() => `${avgWindowMinutes.value} min`);
 
+const averageDirection = (directions: number[]) => {
+  // Circular mean for direction
+  const sinSum = directions.reduce(
+    (s, d) => s + Math.sin((d * Math.PI) / 180),
+    0
+  );
+  const cosSum = directions.reduce(
+    (s, d) => s + Math.cos((d * Math.PI) / 180),
+    0
+  );
+  return ((Math.atan2(sinSum / directions.length, cosSum / directions.length) * 180) /
+      Math.PI +
+      360) %
+    360;
+};
+
 // Average of true_wind_dir_deg and true_wind_speed_mps over the last avgWindowMinutes
 const averageMeasurement = computed(() => {
   if (!latestMeasurement.value || measurements.value.length === 0) return null;
@@ -302,20 +318,7 @@ const averageMeasurement = computed(() => {
   if (window.length === 0) return null;
   const avgSpeed =
     window.reduce((s, m) => s + m.true_wind_speed_mps, 0) / window.length;
-  // Circular mean for direction
-  const sinSum = window.reduce(
-    (s, m) => s + Math.sin((m.true_wind_dir_deg * Math.PI) / 180),
-    0
-  );
-  const cosSum = window.reduce(
-    (s, m) => s + Math.cos((m.true_wind_dir_deg * Math.PI) / 180),
-    0
-  );
-  const avgDir =
-    ((Math.atan2(sinSum / window.length, cosSum / window.length) * 180) /
-      Math.PI +
-      360) %
-    360;
+  const avgDir = averageDirection(window.map((m) => m.true_wind_dir_deg));
   return { true_wind_speed_mps: avgSpeed, true_wind_dir_deg: avgDir };
 });
 
@@ -544,11 +547,9 @@ function updateCharts() {
 
   if (directionChart && directionPoints.length > 0) {
     // Calculate average wind direction
-    const avgDirection =
-      directionPoints.length > 0
-        ? directionPoints.reduce((sum, p) => sum + p.direction, 0) /
-          directionPoints.length
-        : 0;
+    const avgDirection = directionPoints.length > 0 ?
+      averageDirection(directionPoints.map((dp) => dp.direction))
+      : 0;
 
     // Compute displaySpan based on largest distance from average
     let maxDistance = 0;
