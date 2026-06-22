@@ -20,11 +20,10 @@ interface DashboardConfig {
 }
 
 export function loadConfig(): DashboardConfig {
-  const pocketbaseUrl = process.env.POCKETBASE_URL;
+  const pocketbaseUrl = process.env.POCKETBASE_PUBLIC_URL || process.env.POCKETBASE_URL;
   if (!pocketbaseUrl) {
     throw new Error("Missing POCKETBASE_URL environment variable");
   }
-
   const pocketbaseAdminEmail = process.env.POCKETBASE_ADMIN_EMAIL;
   if (!pocketbaseAdminEmail) {
     throw new Error("Missing POCKETBASE_ADMIN_EMAIL environment variable");
