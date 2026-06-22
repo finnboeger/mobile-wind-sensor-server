@@ -12,6 +12,7 @@
           pendingAccelThresholdMs2 = accelThresholdMs2;
           pendingHeadingRateThresholdDegs = headingRateThresholdDegs;
           pendingAvgWindowMinutes = avgWindowMinutes;
+          pendingMinChartWidthDeg = minChartWidthDeg;
           settingsOpen = true;
         "
         aria-label="Open settings"
@@ -132,6 +133,17 @@
           </select>
         </div>
 
+        <div class="settings-row">
+          <label for="min-chart-width-input">Min chart width (deg)</label>
+          <input
+            id="min-chart-width-input"
+            type="number"
+            min="10"
+            max="360"
+            v-model.number="pendingMinChartWidthDeg"
+          />
+        </div>
+
         <div class="settings-footer">
           <button class="apply-btn" @click="applySettings">Apply</button>
         </div>
@@ -228,6 +240,7 @@ function loadStoredSettings(): {
   accelThresholdMs2: number;
   headingRateThresholdDegs: number;
   avgWindowMinutes: number;
+  minChartWidthDeg: number;
 } {
   const defaultSettings = {
     timeFrameMinutes: 30,
@@ -238,6 +251,7 @@ function loadStoredSettings(): {
     accelThresholdMs2: 0.3,
     headingRateThresholdDegs: 10,
     avgWindowMinutes: 10,
+    minChartWidthDeg: 45,
   } as const;
 
   try {
@@ -265,6 +279,7 @@ const pendingHeadingRateThresholdDegs = ref(
   storedSettings.headingRateThresholdDegs
 );
 const pendingAvgWindowMinutes = ref(storedSettings.avgWindowMinutes);
+const pendingMinChartWidthDeg = ref(storedSettings.minChartWidthDeg);
 
 // Set to true to render newest direction samples at the bottom.
 const windSpeedUnit = ref<WindSpeedUnit>(storedSettings.windSpeedUnit);
@@ -274,6 +289,7 @@ const hideInvalidData = ref(storedSettings.hideInvalidData);
 const accelThresholdMs2 = ref(storedSettings.accelThresholdMs2);
 const headingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs);
 const avgWindowMinutes = ref(storedSettings.avgWindowMinutes);
+const minChartWidthDeg = ref(storedSettings.minChartWidthDeg);
 
 const windSpeedUnitLabel = computed(() => {
   if (windSpeedUnit.value === "knots") return "kn";
@@ -392,6 +408,7 @@ async function applySettings() {
   accelThresholdMs2.value = pendingAccelThresholdMs2.value;
   headingRateThresholdDegs.value = pendingHeadingRateThresholdDegs.value;
   avgWindowMinutes.value = pendingAvgWindowMinutes.value;
+  minChartWidthDeg.value = pendingMinChartWidthDeg.value;
   settingsOpen.value = false;
 
   // Persist to local storage
@@ -406,6 +423,7 @@ async function applySettings() {
       accelThresholdMs2: accelThresholdMs2.value,
       headingRateThresholdDegs: headingRateThresholdDegs.value,
       avgWindowMinutes: avgWindowMinutes.value,
+      minChartWidthDeg: minChartWidthDeg.value,
     })
   );
 
@@ -594,8 +612,8 @@ function updateCharts() {
       maxDistance = Math.max(maxDistance, distance);
     }
 
-    // Add 10% padding and cap at 180
-    const displaySpan = Math.min(180, maxDistance + 5);
+    // Use minimum chart width setting, but cap at 180
+    const displaySpan = Math.min(180, Math.max(minChartWidthDeg.value / 2, maxDistance + 5));
     let axisMin = avgDirection - displaySpan;
     let axisMax = avgDirection + displaySpan;
 
