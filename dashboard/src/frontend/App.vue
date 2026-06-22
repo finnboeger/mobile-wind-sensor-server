@@ -13,6 +13,7 @@
           pendingHeadingRateThresholdDegs = headingRateThresholdDegs;
           pendingAvgWindowMinutes = avgWindowMinutes;
           pendingMinChartWidthDeg = minChartWidthDeg;
+          pendingSmoothing = smoothingWindowSec;
           settingsOpen = true;
         "
         aria-label="Open settings"
@@ -144,6 +145,16 @@
           />
         </div>
 
+        <div class="settings-row">
+          <label for="smoothing-select">Chart smoothing</label>
+          <select id="smoothing-select" v-model.number="pendingSmoothing">
+            <option :value="5">5 s (none)</option>
+            <option v-for="s in [10, 15, 30, 45, 60]" :key="s" :value="s">
+              {{ s }} s
+            </option>
+          </select>
+        </div>
+
         <div class="settings-footer">
           <button class="apply-btn" @click="applySettings">Apply</button>
         </div>
@@ -241,6 +252,7 @@ function loadStoredSettings(): {
   headingRateThresholdDegs: number;
   avgWindowMinutes: number;
   minChartWidthDeg: number;
+  smoothingWindowSec: number;
 } {
   const defaultSettings = {
     timeFrameMinutes: 30,
@@ -252,6 +264,7 @@ function loadStoredSettings(): {
     headingRateThresholdDegs: 10,
     avgWindowMinutes: 10,
     minChartWidthDeg: 45,
+    smoothingWindowSec: 5,
   } as const;
 
   try {
@@ -280,6 +293,7 @@ const pendingHeadingRateThresholdDegs = ref(
 );
 const pendingAvgWindowMinutes = ref(storedSettings.avgWindowMinutes);
 const pendingMinChartWidthDeg = ref(storedSettings.minChartWidthDeg);
+const pendingSmoothing = ref(storedSettings.smoothingWindowSec);
 
 // Set to true to render newest direction samples at the bottom.
 const windSpeedUnit = ref<WindSpeedUnit>(storedSettings.windSpeedUnit);
@@ -290,6 +304,7 @@ const accelThresholdMs2 = ref(storedSettings.accelThresholdMs2);
 const headingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs);
 const avgWindowMinutes = ref(storedSettings.avgWindowMinutes);
 const minChartWidthDeg = ref(storedSettings.minChartWidthDeg);
+const smoothingWindowSec = ref(storedSettings.smoothingWindowSec);
 
 const windSpeedUnitLabel = computed(() => {
   if (windSpeedUnit.value === "knots") return "kn";
@@ -308,19 +323,32 @@ const avgWindow = computed(() => `${avgWindowMinutes.value} min`);
 
 const averageDirection = (directions: number[]) => {
   // Circular mean for direction
-  const sinSum = directions.reduce(
-    (s, d) => s + Math.sin((d * Math.PI) / 180),
-    0
-  );
-  const cosSum = directions.reduce(
-    (s, d) => s + Math.cos((d * Math.PI) / 180),
-    0
-  );
-  return ((Math.atan2(sinSum / directions.length, cosSum / directions.length) * 180) /
-      Math.PI +
-      360) %
-    360;
+  const sinSum = directions.reduce((s, d) => s + Math.sin((d * Math.PI) / 180), 0);
+  const cosSum = directions.reduce((s, d) => s + Math.cos((d * Math.PI) / 180), 0);
+  return ((Math.atan2(sinSum / directions.length, cosSum / directions.length) * 180) / Math.PI + 360) % 360;
 };
+
+// Rolling average smoothing helpers.
+// measurements is sorted newest-first; windowSamples = smoothingWindowSec - 4
+// (accounts for the 5 s pre-averaging already applied to incoming data).
+function smoothDirections(points: { direction: number; timeMs: number }[], windowSamples: number): { direction: number; timeMs: number }[] {
+  if (windowSamples <= 1) return points;
+  return points.map((_, i) => {
+    const slice = points.slice(i, i + windowSamples);
+    return { direction: averageDirection(slice.map((p) => p.direction)), timeMs: points[i].timeMs };
+  });
+}
+
+function smoothSpeeds(points: { speed: number; time: string }[], windowSamples: number): { speed: number; time: string }[] {
+  if (windowSamples <= 1) return points;
+  return points.map((_, i) => {
+    const slice = points.slice(i, i + windowSamples);
+    const avg = slice.reduce((s, p) => s + p.speed, 0) / slice.length;
+    return { speed: avg, time: points[i].time };
+  });
+}
+
+const smoothingSamples = computed(() => Math.max(1, smoothingWindowSec.value - 4));
 
 // Average of true_wind_dir_deg and true_wind_speed_mps over the last avgWindowMinutes
 const averageMeasurement = computed(() => {
@@ -409,6 +437,7 @@ async function applySettings() {
   headingRateThresholdDegs.value = pendingHeadingRateThresholdDegs.value;
   avgWindowMinutes.value = pendingAvgWindowMinutes.value;
   minChartWidthDeg.value = pendingMinChartWidthDeg.value;
+  smoothingWindowSec.value = pendingSmoothing.value;
   settingsOpen.value = false;
 
   // Persist to local storage
@@ -424,6 +453,7 @@ async function applySettings() {
       headingRateThresholdDegs: headingRateThresholdDegs.value,
       avgWindowMinutes: avgWindowMinutes.value,
       minChartWidthDeg: minChartWidthDeg.value,
+      smoothingWindowSec: smoothingWindowSec.value,
     })
   );
 
@@ -576,10 +606,11 @@ function updateCharts() {
   }
 
   // Wind direction chart (x = direction, y = time)
-  const directionPoints = measurements.value.map((m) => ({
+  const rawDirectionPoints = measurements.value.map((m) => ({
     direction: m.true_wind_dir_deg,
     timeMs: new Date(m.ts).getTime(),
   }));
+  const directionPoints = smoothDirections(rawDirectionPoints, smoothingSamples.value);
 
   if (directionChart && directionPoints.length > 0) {
     // Compute unreliable ranges first
@@ -810,11 +841,12 @@ function updateCharts() {
     );
   }
 
-  // Wind speed chart (smoothed with gust)
-  const speedPoints = measurements.value.map((m) => ({
+  // Wind speed chart
+  const rawSpeedPoints = measurements.value.map((m) => ({
     speed: convertWindSpeed(m.true_wind_speed_mps),
     time: new Date(m.ts).toLocaleTimeString(),
   }));
+  const speedPoints = smoothSpeeds(rawSpeedPoints, smoothingSamples.value);
 
   if (speedChart && speedPoints.length > 0) {
     console.log(
