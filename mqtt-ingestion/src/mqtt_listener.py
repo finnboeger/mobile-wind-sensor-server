@@ -67,7 +67,7 @@ class MqttListener:
                 client.subscribe(topic)
                 logger.info(f"✓ Subscribed to: {topic}")
 
-    def _on_disconnect(self, client, userdata, disconnect_flags, auth_data, reason_code):
+    def _on_disconnect(self, client, userdata, disconnect_flags, reason_code, properties):
         """MQTT disconnect callback"""
         if reason_code.is_failure:
             logger.warning(f"Unexpected disconnection from MQTT broker: {reason_code}")
