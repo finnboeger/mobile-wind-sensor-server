@@ -16,11 +16,14 @@ Configuration via environment variables:
 """
 
 import logging
+from queue import Queue
 import signal
 import sys
+import threading
 import time
-from src.config import load_config
+from src.config import MqttConfig
 from src.mqtt_listener import MqttListener
+from src.pocketbase_writer import PocketbaseWriter
 
 # Configure logging
 logging.basicConfig(
@@ -39,6 +42,11 @@ def shutdown_handler(signum, frame):
         mqtt_listener.disconnect()
     sys.exit(0)
 
+def process_queue(output_queue: Queue, pocketbase_writer: PocketbaseWriter):
+    while True:
+        measurement = output_queue.get()
+        pocketbase_writer.write_measurement(measurement)
+
 
 def main():
     """Main entry point"""
@@ -47,7 +55,7 @@ def main():
     try:
         # Load configuration
         logger.info("Loading configuration...")
-        config = load_config()
+        config = MqttConfig()
         logger.info(f"Configuration loaded: {config.mqtt_host}:{config.mqtt_port}")
 
         # Set log level
@@ -66,14 +74,23 @@ def main():
             logger.error("PocketBase configuration is incomplete")
             sys.exit(1)
         mqtt_listener = MqttListener(
+            config,
+        )
+        pocketbase_writer = PocketbaseWriter(
             config.pocketbase_url,
             config.pocketbase_admin_email,
             config.pocketbase_admin_password,
-            config,
         )
 
         # Connect to MQTT
         mqtt_listener.connect()
+
+        # Start processing loop
+        threading.Thread(
+            target=process_queue, 
+            args=(mqtt_listener.outputQueue, pocketbase_writer), 
+            daemon=True
+        ).start()
 
         # Setup signal handlers
         signal.signal(signal.SIGINT, shutdown_handler)

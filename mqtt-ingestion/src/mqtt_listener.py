@@ -10,30 +10,19 @@ from typing import Optional
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 from pocketbase import PocketBase
+from queue import Queue
 
 logger = logging.getLogger(__name__)
 
 
 class MqttListener:
-    def __init__(self, pocketbase_url: str, pocketbase_email: str, pocketbase_password: str, mqtt_config):
-        self.pocketbase_url = pocketbase_url
-        self.pocketbase_email = pocketbase_email
-        self.pocketbase_password = pocketbase_password
+    def __init__(self, mqtt_config):
         self.pb: Optional[PocketBase] = None
         self.mqtt_config = mqtt_config
         self.client: Optional[mqtt.Client] = None
+        self.outputQueue = Queue()
 
         self.stats = {"messages_received": 0, "messages_processed": 0, "messages_failed": 0}
-
-    def _authenticate(self) -> None:
-        """Authenticate with PocketBase using admin credentials"""
-        try:
-            self.pb = PocketBase(self.pocketbase_url)
-            self.pb.admins.auth_with_password(self.pocketbase_email, self.pocketbase_password)
-            logger.info("✓ Authenticated with PocketBase")
-        except Exception as e:
-            logger.error(f"Failed to authenticate with PocketBase: {e}")
-            raise
 
     def connect(self) -> None:
         """Connect to MQTT broker and authenticate with PocketBase"""
@@ -99,7 +88,7 @@ class MqttListener:
             data = self._normalize_measurement(topic, payload_data)
 
             # Write to PocketBase
-            self.write_measurement(data)
+            self.outputQueue.put(data)
             self.stats["messages_processed"] += 1
 
             if self.mqtt_config.log_level == "debug":
@@ -154,32 +143,6 @@ class MqttListener:
             "apparent_wind_dir_deg": apparent_wind.get("direction"),
             "apparent_wind_speed_mps": apparent_wind.get("speed"),
         }
-
-    def write_measurement(self, measurement: dict) -> None:
-        """Write or update measurement in PocketBase"""
-        try:
-            if self.pb is None:
-                raise ValueError("PocketBase client is not initialized")
-            source_id = measurement.get("source_id")
-            ts = measurement.get("ts")
-
-            # Try to find existing record
-            filter_query = f'source_id = "{source_id}" && ts = "{ts}"'
-            records = self.pb.collection("measurements").get_list(
-                query_params={"filter": filter_query, "limit": 1}
-            )
-
-            if records.items:
-                # Update existing record
-                record_id = records.items[0].id
-                self.pb.collection("measurements").update(record_id, measurement)
-            else:
-                # Create new record
-                self.pb.collection("measurements").create(measurement)
-
-        except Exception as e:
-            logger.error(f"Failed to write measurement to PocketBase: {e}")
-            raise
 
     def get_stats(self) -> dict:
         """Get listener statistics"""
