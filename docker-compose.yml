@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # PocketBase: shared database with public read / authenticated write
   pocketbase:
-    image: ghcr.io/pocketbase/pocketbase:latest
+    image: ghcr.io/muchobien/pocketbase:latest
     container_name: wind-dashboard-pocketbase
     ports:
       - "${POCKETBASE_PORT:-8090}:8090"
@@ -13,10 +13,19 @@ services:
     environment:
       - POCKETBASE_ENCRYPTION_KEY=${POCKETBASE_ENCRYPTION_KEY:-}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:8090/api/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - wind-network
 
