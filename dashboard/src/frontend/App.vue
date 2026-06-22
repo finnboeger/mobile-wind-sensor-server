@@ -602,8 +602,10 @@ function updateCharts() {
       : directionPoints.length > 0 ? averageDirection(directionPoints.map((dp) => dp.direction)) : 0;
 
     // Compute displaySpan based on largest distance from average
+    // When hiding invalid data, only use reliable points for span calculation
+    const pointsForSpan = hideInvalidData.value ? reliableDirectionPoints : directionPoints;
     let maxDistance = 0;
-    for (const point of directionPoints) {
+    for (const point of pointsForSpan) {
       let distance = Math.abs(point.direction - avgDirection);
       // Handle wrap-around: the shortest distance might be the other way
       if (distance > 180) {
