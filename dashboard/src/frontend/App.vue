@@ -406,9 +406,12 @@ function computeUnreliableRanges(
         eventTimes.push(midTime);
     }
     if (a.sensor_heading_deg != null && b.sensor_heading_deg != null) {
-      let dh = Math.abs(a.sensor_heading_deg - b.sensor_heading_deg);
-      if (dh > 180) dh = 360 - dh;
-      if (dh / dtS > headingRateThresholdDegs.value) eventTimes.push(midTime);
+      const avgSpeed = (a.sensor_speed_mps + b.sensor_speed_mps) / 2;
+      if (avgSpeed > 1) {
+        let dh = Math.abs(a.sensor_heading_deg - b.sensor_heading_deg);
+        if (dh > 180) dh = 360 - dh;
+        if (dh / dtS > headingRateThresholdDegs.value) eventTimes.push(midTime);
+      }
     }
   }
   const raw = eventTimes.map(
