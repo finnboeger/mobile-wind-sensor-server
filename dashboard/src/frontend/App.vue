@@ -149,7 +149,7 @@
           <label for="smoothing-select">Chart smoothing</label>
           <select id="smoothing-select" v-model.number="pendingSmoothing">
             <option :value="5">5 s (none)</option>
-            <option v-for="s in [10, 15, 30, 45, 60]" :key="s" :value="s">
+            <option v-for="s in [10, 15, 30, 45, 60, 90, 120]" :key="s" :value="s">
               {{ s }} s
             </option>
           </select>
@@ -264,7 +264,7 @@ function loadStoredSettings(): {
     headingRateThresholdDegs: 10,
     avgWindowMinutes: 10,
     minChartWidthDeg: 45,
-    smoothingWindowSec: 5,
+    smoothingWindowSec: 30,
   } as const;
 
   try {
@@ -339,12 +339,12 @@ function smoothDirections(points: { direction: number; timeMs: number }[], windo
   });
 }
 
-function smoothSpeeds(points: { speed: number; time: string }[], windowSamples: number): { speed: number; time: string }[] {
+function smoothSpeeds(points: { speed: number; time: string; timeMs: number }[], windowSamples: number): { speed: number; time: string; timeMs: number }[] {
   if (windowSamples <= 1) return points;
   return points.map((_, i) => {
     const slice = points.slice(i, i + windowSamples);
     const avg = slice.reduce((s, p) => s + p.speed, 0) / slice.length;
-    return { speed: avg, time: points[i].time };
+    return { speed: avg, time: points[i].time, timeMs: points[i].timeMs };
   });
 }
 
@@ -612,20 +612,22 @@ function updateCharts() {
   }));
   const directionPoints = smoothDirections(rawDirectionPoints, smoothingSamples.value);
 
-  if (directionChart && directionPoints.length > 0) {
-    // Compute unreliable ranges first
-    const unreliableRanges = computeUnreliableRanges(
-      measurements.value,
-      exclusionWindowSec.value * 1000
-    );
+  // Compute unreliable ranges once for use in both charts
+  const unreliableRanges = computeUnreliableRanges(
+    measurements.value,
+    exclusionWindowSec.value * 1000
+  );
 
+  function isUnreliableTs(timeMs: number): boolean {
+    for (const [start, end] of unreliableRanges) {
+      if (timeMs >= start && timeMs <= end) return true;
+    }
+    return false;
+  }
+
+  if (directionChart && directionPoints.length > 0) {
     // Filter out unreliable points for average calculation
-    const reliableDirectionPoints = directionPoints.filter((p) => {
-      for (const [start, end] of unreliableRanges) {
-        if (p.timeMs >= start && p.timeMs <= end) return false;
-      }
-      return true;
-    });
+    const reliableDirectionPoints = directionPoints.filter((p) => !isUnreliableTs(p.timeMs));
 
     // Calculate average wind direction (excluding unreliable samples)
     const avgDirection = reliableDirectionPoints.length > 0 ?
@@ -673,12 +675,6 @@ function updateCharts() {
     const excludedSeriesData: Array<[number, number] | [null, null]> = [];
     const eps = 1e-6;
 
-    function isUnreliable(timeMs: number): boolean {
-      for (const [start, end] of unreliableRanges) {
-        if (timeMs >= start && timeMs <= end) return true;
-      }
-      return false;
-    }
 
     function pushPoint(
       direction: number,
@@ -733,7 +729,7 @@ function updateCharts() {
     // If the normalized gap exceeds 180 deg, force a cutoff break.
     for (let i = 0; i < normalizedPoints.length; ++i) {
       const point = normalizedPoints[i];
-      const pointUnreliable = isUnreliable(point.timeMs);
+      const pointUnreliable = isUnreliableTs(point.timeMs);
       appendSample(point.direction, point.timeMs, pointUnreliable);
 
       if (i >= normalizedPoints.length - 1) continue;
@@ -749,8 +745,8 @@ function updateCharts() {
       const afterCutoff = crossesLeftFirst ? axisMax - eps : axisMin + eps;
       const cutTimeBefore = point.timeMs + 0.499;
       const cutTimeAfter = point.timeMs + 0.501;
-      const beforeUnreliable = isUnreliable(cutTimeBefore);
-      const afterUnreliable = isUnreliable(cutTimeAfter);
+      const beforeUnreliable = isUnreliableTs(cutTimeBefore);
+      const afterUnreliable = isUnreliableTs(cutTimeAfter);
 
       appendSample(beforeCutoff, cutTimeBefore, beforeUnreliable);
       pushBreak();
@@ -845,10 +841,17 @@ function updateCharts() {
   const rawSpeedPoints = measurements.value.map((m) => ({
     speed: convertWindSpeed(m.true_wind_speed_mps),
     time: new Date(m.ts).toLocaleTimeString(),
+    timeMs: new Date(m.ts).getTime(),
   }));
   const speedPoints = smoothSpeeds(rawSpeedPoints, smoothingSamples.value);
 
   if (speedChart && speedPoints.length > 0) {
+    const reliableSpeedData = speedPoints.map((p) =>
+      isUnreliableTs(p.timeMs) ? null : p.speed
+    );
+    const excludedSpeedData = speedPoints.map((p) =>
+      isUnreliableTs(p.timeMs) ? p.speed : null
+    );
     console.log(
       "Updating speed chart with",
       speedPoints.length,
@@ -868,7 +871,13 @@ function updateCharts() {
         },
         series: [
           {
-            data: speedPoints.map((p) => p.speed),
+            name: "Wind Speed (Reliable)",
+            data: reliableSpeedData,
+          },
+          {
+            name: "Wind Speed (Excluded)",
+            show: !hideInvalidData.value,
+            data: hideInvalidData.value ? [] : excludedSpeedData,
           },
         ],
       });
@@ -1035,7 +1044,7 @@ function initCharts() {
     },
     series: [
       {
-        name: "Wind Speed",
+        name: "Wind Speed (Reliable)",
         type: "line",
         data: [],
         animation: false,
@@ -1049,6 +1058,24 @@ function initCharts() {
         /*areaStyle: {
           color: 'rgba(118, 75, 162, 0.1)',
         },*/
+      },
+      {
+        name: "Wind Speed (Excluded)",
+        type: "line",
+        data: [],
+        animation: false,
+        smooth: true,
+        symbol: "circle",
+        symbolSize: 4,
+        showSymbol: false,
+        itemStyle: {
+          color: "#764ba2",
+        },
+        lineStyle: {
+          type: "dashed",
+          width: 2,
+          opacity: 0.9,
+        },
       },
     ],
   });
