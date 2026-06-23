@@ -215,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
 import PocketBase from "pocketbase";
 import * as echarts from "echarts";
 
@@ -476,6 +476,15 @@ async function applySettings() {
 let pb: PocketBase;
 let directionChart: echarts.ECharts | null = null;
 let speedChart: echarts.ECharts | null = null;
+let backfillInProgress = false;
+
+const DATA_GAP_THRESHOLD_MS = 2_000;
+
+function parseTsMs(ts?: string): number | null {
+  if (!ts) return null;
+  const ms = new Date(ts).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
 
 function fail(reason: string): never {
   throw new Error(reason);
@@ -589,6 +598,66 @@ async function loadMeasurements() {
   } catch (e) {
     console.error("Failed to load measurements:", e);
   }
+}
+
+async function backfillMissingMeasurements() {
+  if (backfillInProgress) return;
+  if (!pb) return;
+
+  const lastKnownTsMs = parseTsMs(latestMeasurement.value?.ts);
+  if (lastKnownTsMs == null) {
+    // await loadMeasurements();
+    return;
+  }
+
+  if (Date.now() - lastKnownTsMs <= DATA_GAP_THRESHOLD_MS) {
+    return;
+  }
+
+  backfillInProgress = true;
+  try {
+    const desiredCount = timeFrameMinutes.value * 60;
+    const pageSize = Math.min(desiredCount, 500);
+    const filterTs = new Date(lastKnownTsMs).toISOString();
+
+    let page = 1;
+    let fetched: Measurement[] = [];
+
+    while (fetched.length < desiredCount) {
+      const records = await pb
+        .collection("measurements")
+        .getList<Measurement>(page, pageSize, {
+          sort: "-ts",
+          filter: `ts > \"${filterTs}\"`,
+        });
+
+      fetched = fetched.concat(records.items);
+      if (records.items.length < pageSize) break;
+      page++;
+    }
+
+    if (fetched.length === 0) return;
+
+    const seenIds = new Set(measurements.value.map((m) => m.id));
+    const merged = [
+      ...fetched.filter((m) => !seenIds.has(m.id)),
+      ...measurements.value,
+    ].sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
+    measurements.value = merged.slice(0, desiredCount);
+    latestMeasurement.value = measurements.value[0] ?? latestMeasurement.value;
+    updateCharts();
+    updateTime();
+  } catch (e) {
+    console.error("Failed to backfill missing measurements:", e);
+  } finally {
+    backfillInProgress = false;
+  }
+}
+
+function handleTabRefocus() {
+  if (document.hidden) return;
+  void backfillMissingMeasurements();
 }
 
 function updateTime() {
@@ -1092,7 +1161,14 @@ function initCharts() {
 }
 
 onMounted(() => {
+  document.addEventListener("visibilitychange", handleTabRefocus);
+  window.addEventListener("focus", handleTabRefocus);
   initializePocketBase();
+});
+
+onUnmounted(() => {
+  document.removeEventListener("visibilitychange", handleTabRefocus);
+  window.removeEventListener("focus", handleTabRefocus);
 });
 
 // Initialize charts once content becomes visible
