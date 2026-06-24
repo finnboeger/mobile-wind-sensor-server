@@ -335,6 +335,91 @@ function convertWindSpeed(speedMps: number): number {
   return speedMps;
 }
 
+function formatSpeed(speedMps?: number): string {
+  if (speedMps == null || !Number.isFinite(speedMps)) return "—";
+  return `${convertWindSpeed(speedMps).toFixed(1)} ${windSpeedUnitLabel.value}`;
+}
+
+function formatDirection(deg?: number): string {
+  if (deg == null || !Number.isFinite(deg)) return "—";
+  return `${deg.toFixed(0)}°`;
+}
+
+function getClosestMeasurementByTimeMs(timeMs: number): Measurement | null {
+  if (!Number.isFinite(timeMs) || measurements.value.length === 0) return null;
+
+  let closest: Measurement | null = null;
+  let closestDiff = Number.POSITIVE_INFINITY;
+
+  for (const m of measurements.value) {
+    const mTs = new Date(m.ts).getTime();
+    const diff = Math.abs(mTs - timeMs);
+    if (diff < closestDiff) {
+      closest = m;
+      closestDiff = diff;
+      if (diff === 0) break;
+    }
+  }
+
+  return closest;
+}
+
+function getTooltipMeasurement(paramsOrParam: any): Measurement | null {
+  const params = Array.isArray(paramsOrParam)
+    ? paramsOrParam
+    : [paramsOrParam];
+  const usableParams = params.filter(
+    (p) => p && p.componentSubType !== "markLine"
+  );
+  if (usableParams.length === 0) return null;
+
+  // Direction chart data points are [direction, timeMs].
+  const timePointParam = usableParams.find(
+    (p) =>
+      Array.isArray(p.data) &&
+      p.data.length >= 2 &&
+      typeof p.data[1] === "number"
+  );
+  if (timePointParam) {
+    return getClosestMeasurementByTimeMs(timePointParam.data[1]);
+  }
+
+  // Speed chart points align 1:1 with measurements by dataIndex.
+  const indexedParam = usableParams.find(
+    (p) =>
+      typeof p.dataIndex === "number" &&
+      p.dataIndex >= 0 &&
+      p.dataIndex < measurements.value.length
+  );
+  if (indexedParam) {
+    return measurements.value[indexedParam.dataIndex];
+  }
+
+  // Axis-trigger fallback (for time axis values on direction chart).
+  const axisValue = usableParams[0]?.axisValue;
+  if (typeof axisValue === "number") {
+    return getClosestMeasurementByTimeMs(axisValue);
+  }
+
+  return null;
+}
+
+function buildMeasurementTooltip(paramsOrParam: any): string {
+  const measurement = getTooltipMeasurement(paramsOrParam);
+  if (!measurement) return "No measurement available";
+
+  const ts = new Date(measurement.ts).toLocaleTimeString();
+  return [
+    `<strong>${ts}</strong>`,
+    `True wind speed: ${formatSpeed(measurement.true_wind_speed_mps)}`,
+    `True wind direction: ${formatDirection(measurement.true_wind_dir_deg)}`,
+    `Sensor speed: ${formatSpeed(measurement.sensor_speed_mps)}`,
+    `Sensor direction: ${formatDirection(measurement.sensor_heading_deg)}`,
+    `Apparent wind speed: ${formatSpeed(measurement.apparent_wind_speed_mps)}`,
+    `Apparent wind direction: ${formatDirection(measurement.apparent_wind_dir_deg)}`,
+  ].join("<br/>");
+}
+
 // Human-readable label shown in the KPI cards
 const avgWindow = computed(() => `${avgWindowMinutes.value} min`);
 
@@ -999,6 +1084,14 @@ function initCharts() {
     animation: false,
     animationDuration: 0,
     animationDurationUpdate: 0,
+    tooltip: {
+      trigger: "axis",
+      axisPointer: {
+        type: "cross",
+        snap: true,
+      },
+      formatter: (params: any) => buildMeasurementTooltip(params),
+    },
     grid: {
       left: "24px",
       right: "16px",
@@ -1107,6 +1200,14 @@ function initCharts() {
     animation: false,
     animationDuration: 0,
     animationDurationUpdate: 0,
+    tooltip: {
+      trigger: "axis",
+      axisPointer: {
+        type: "line",
+        snap: true,
+      },
+      formatter: (params: any) => buildMeasurementTooltip(params),
+    },
     grid: {
       left: "24px",
       right: "16px",
