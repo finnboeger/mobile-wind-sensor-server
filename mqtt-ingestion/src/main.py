@@ -86,11 +86,12 @@ def main():
         mqtt_listener.connect()
 
         # Start processing loop
-        threading.Thread(
+        processing_thread = threading.Thread(
             target=process_queue, 
             args=(mqtt_listener.outputQueue, pocketbase_writer), 
             daemon=True
-        ).start()
+        )
+        processing_thread.start()
 
         # Setup signal handlers
         signal.signal(signal.SIGINT, shutdown_handler)
@@ -98,15 +99,7 @@ def main():
 
         logger.info("✓ MQTT Ingestion Service started successfully")
 
-        # Log statistics every 30 seconds
-        while True:
-            time.sleep(30)
-            stats = mqtt_listener.get_stats()
-            logger.info(
-                f"[STATS] Received: {stats['messages_received']}, "
-                f"Processed: {stats['messages_processed']}, "
-                f"Failed: {stats['messages_failed']}"
-            )
+        processing_thread.join()
 
     except Exception as e:
         logger.error(f"Failed to start MQTT Ingestion Service: {e}")
