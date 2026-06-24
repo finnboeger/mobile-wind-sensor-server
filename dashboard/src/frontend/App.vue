@@ -13,6 +13,7 @@
           pendingHeadingRateThresholdDegs = headingRateThresholdDegs;
           pendingAvgWindowMinutes = avgWindowMinutes;
           pendingMinChartWidthDeg = minChartWidthDeg;
+          pendingMaxDisplaySpanDeg = maxDisplaySpanDeg;
           pendingSmoothing = smoothingWindowSec;
           settingsOpen = true;
         "
@@ -146,6 +147,18 @@
         </div>
 
         <div class="settings-row">
+          <label for="max-display-span-select">Max display span</label>
+          <select
+            id="max-display-span-select"
+            v-model.number="pendingMaxDisplaySpanDeg"
+          >
+            <option v-for="d in [45, 90, 180, 270, 360]" :key="d" :value="d">
+              {{ d }}°{{ d === 360 ? " (default)" : "" }}
+            </option>
+          </select>
+        </div>
+
+        <div class="settings-row">
           <label for="smoothing-select">Chart smoothing</label>
           <select id="smoothing-select" v-model.number="pendingSmoothing">
             <option :value="5">5 s (none)</option>
@@ -252,6 +265,7 @@ function loadStoredSettings(): {
   headingRateThresholdDegs: number;
   avgWindowMinutes: number;
   minChartWidthDeg: number;
+  maxDisplaySpanDeg: number;
   smoothingWindowSec: number;
 } {
   const defaultSettings = {
@@ -264,6 +278,7 @@ function loadStoredSettings(): {
     headingRateThresholdDegs: 10,
     avgWindowMinutes: 10,
     minChartWidthDeg: 45,
+    maxDisplaySpanDeg: 360,
     smoothingWindowSec: 30,
   } as const;
 
@@ -293,6 +308,7 @@ const pendingHeadingRateThresholdDegs = ref(
 );
 const pendingAvgWindowMinutes = ref(storedSettings.avgWindowMinutes);
 const pendingMinChartWidthDeg = ref(storedSettings.minChartWidthDeg);
+const pendingMaxDisplaySpanDeg = ref(storedSettings.maxDisplaySpanDeg);
 const pendingSmoothing = ref(storedSettings.smoothingWindowSec);
 
 // Set to true to render newest direction samples at the bottom.
@@ -304,6 +320,7 @@ const accelThresholdMs2 = ref(storedSettings.accelThresholdMs2);
 const headingRateThresholdDegs = ref(storedSettings.headingRateThresholdDegs);
 const avgWindowMinutes = ref(storedSettings.avgWindowMinutes);
 const minChartWidthDeg = ref(storedSettings.minChartWidthDeg);
+const maxDisplaySpanDeg = ref(storedSettings.maxDisplaySpanDeg);
 const smoothingWindowSec = ref(storedSettings.smoothingWindowSec);
 
 const windSpeedUnitLabel = computed(() => {
@@ -440,6 +457,7 @@ async function applySettings() {
   headingRateThresholdDegs.value = pendingHeadingRateThresholdDegs.value;
   avgWindowMinutes.value = pendingAvgWindowMinutes.value;
   minChartWidthDeg.value = pendingMinChartWidthDeg.value;
+  maxDisplaySpanDeg.value = pendingMaxDisplaySpanDeg.value;
   smoothingWindowSec.value = pendingSmoothing.value;
   settingsOpen.value = false;
 
@@ -456,6 +474,7 @@ async function applySettings() {
       headingRateThresholdDegs: headingRateThresholdDegs.value,
       avgWindowMinutes: avgWindowMinutes.value,
       minChartWidthDeg: minChartWidthDeg.value,
+      maxDisplaySpanDeg: maxDisplaySpanDeg.value,
       smoothingWindowSec: smoothingWindowSec.value,
     })
   );
@@ -719,8 +738,8 @@ function updateCharts() {
       maxDistance = Math.max(maxDistance, distance);
     }
 
-    // Use minimum chart width setting, but cap at 180
-    const displaySpan = Math.min(180, Math.max(minChartWidthDeg.value / 2, maxDistance + 5));
+    // Use minimum chart width setting, but cap at user-selected maximum display span.
+    const displaySpan = Math.min(maxDisplaySpanDeg.value / 2, Math.max(minChartWidthDeg.value / 2, maxDistance + 5));
     let axisMin = avgDirection - displaySpan;
     let axisMax = avgDirection + displaySpan;
 
