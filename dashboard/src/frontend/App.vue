@@ -364,6 +364,27 @@ function getClosestMeasurementByTimeMs(timeMs: number): Measurement | null {
   return closest;
 }
 
+function getNearestSpeedPointByTimeMs(
+  timeMs: number
+): { time: string; timeMs: number } | null {
+  if (latestSpeedPoints.length === 0) return null;
+
+  let nearest = latestSpeedPoints[0];
+  let bestDiff = Math.abs(nearest.timeMs - timeMs);
+
+  for (let i = 1; i < latestSpeedPoints.length; i++) {
+    const point = latestSpeedPoints[i];
+    const diff = Math.abs(point.timeMs - timeMs);
+    if (diff < bestDiff) {
+      nearest = point;
+      bestDiff = diff;
+      if (diff === 0) break;
+    }
+  }
+
+  return nearest;
+}
+
 function getTooltipMeasurement(paramsOrParam: any): Measurement | null {
   const params = Array.isArray(paramsOrParam)
     ? paramsOrParam
@@ -404,7 +425,64 @@ function getTooltipMeasurement(paramsOrParam: any): Measurement | null {
   return null;
 }
 
+function getHoveredTimeMsFromTooltipParams(paramsOrParam: any): number | null {
+  const measurement = getTooltipMeasurement(paramsOrParam);
+  return parseTsMs(measurement?.ts);
+}
+
+function getDirectionHoverMarkLineData(): Array<Record<string, unknown>> {
+  if (hoveredTimeMs == null) return [];
+  return [
+    {
+      yAxis: hoveredTimeMs,
+      lineStyle: {
+        color: "#2f855a",
+        type: "dashed",
+        width: 1,
+      },
+      label: {
+        show: false,
+      },
+    },
+  ];
+}
+
+function getSpeedHoverMarkLineData(): Array<Record<string, unknown>> {
+  if (hoveredTimeMs == null) return [];
+  const nearest = getNearestSpeedPointByTimeMs(hoveredTimeMs);
+  if (!nearest) return [];
+  return [
+    {
+      xAxis: nearest.time,
+      lineStyle: {
+        color: "#2f855a",
+        type: "dashed",
+        width: 1,
+      },
+      label: {
+        show: false,
+      },
+    },
+  ];
+}
+
+function syncHoverTimeLines(): void {
+  directionChart?.setOption({
+    series: [{}, {}, { markLine: { data: getDirectionHoverMarkLineData() } }],
+  });
+  speedChart?.setOption({
+    series: [{}, {}, { markLine: { data: getSpeedHoverMarkLineData() } }],
+  });
+}
+
+function setHoveredTimeMs(timeMs: number | null): void {
+  if (hoveredTimeMs === timeMs) return;
+  hoveredTimeMs = timeMs;
+  syncHoverTimeLines();
+}
+
 function buildMeasurementTooltip(paramsOrParam: any): string {
+  setHoveredTimeMs(getHoveredTimeMsFromTooltipParams(paramsOrParam));
   const measurement = getTooltipMeasurement(paramsOrParam);
   if (!measurement) return "No measurement available";
 
@@ -581,6 +659,8 @@ let pb: PocketBase;
 let directionChart: echarts.ECharts | null = null;
 let speedChart: echarts.ECharts | null = null;
 let backfillInProgress = false;
+let hoveredTimeMs: number | null = null;
+let latestSpeedPoints: Array<{ time: string; timeMs: number }> = [];
 
 const DATA_GAP_THRESHOLD_MS = 2_000;
 
@@ -999,6 +1079,18 @@ function updateCharts() {
               opacity: 0.9,
             },
           },
+          {
+            name: "Direction (Hover Time)",
+            data: [],
+            markLine: {
+              symbol: ["none", "none"],
+              silent: true,
+              data: getDirectionHoverMarkLineData(),
+            },
+            lineStyle: {
+              opacity: 0,
+            },
+          },
         ],
       });
       console.log("✓ Direction chart updated");
@@ -1020,6 +1112,7 @@ function updateCharts() {
     timeMs: new Date(m.ts).getTime(),
   }));
   const speedPoints = smoothSpeeds(rawSpeedPoints, smoothingSamples.value);
+  latestSpeedPoints = speedPoints.map((p) => ({ time: p.time, timeMs: p.timeMs }));
 
   if (speedChart && speedPoints.length > 0) {
     const reliableSpeedData = speedPoints.map((p) =>
@@ -1055,6 +1148,18 @@ function updateCharts() {
             show: !hideInvalidData.value,
             data: hideInvalidData.value ? [] : excludedSpeedData,
           },
+          {
+            name: "Wind Speed (Hover Time)",
+            data: [],
+            markLine: {
+              symbol: ["none", "none"],
+              silent: true,
+              data: getSpeedHoverMarkLineData(),
+            },
+            lineStyle: {
+              opacity: 0,
+            },
+          },
         ],
       });
       console.log("✓ Speed chart updated");
@@ -1080,6 +1185,9 @@ function initCharts() {
 
   // Wind direction chart
   directionChart = echarts.init(dirContainer);
+  directionChart.on("globalout", () => {
+    setHoveredTimeMs(null);
+  });
   directionChart.setOption({
     animation: false,
     animationDuration: 0,
@@ -1190,12 +1298,29 @@ function initCharts() {
           opacity: 0.9,
         },
       },
+      {
+        name: "Direction (Hover Time)",
+        type: "line",
+        data: [],
+        symbol: "none",
+        lineStyle: {
+          opacity: 0,
+        },
+        markLine: {
+          symbol: ["none", "none"],
+          silent: true,
+          data: [],
+        },
+      },
     ],
   });
   console.log("✓ Direction chart initialized");
 
   // Wind speed chart
   speedChart = echarts.init(speedContainer);
+  speedChart.on("globalout", () => {
+    setHoveredTimeMs(null);
+  });
   speedChart.setOption({
     animation: false,
     animationDuration: 0,
@@ -1267,6 +1392,20 @@ function initCharts() {
           type: "dashed",
           width: 2,
           opacity: 0.9,
+        },
+      },
+      {
+        name: "Wind Speed (Hover Time)",
+        type: "line",
+        data: [],
+        symbol: "none",
+        lineStyle: {
+          opacity: 0,
+        },
+        markLine: {
+          symbol: ["none", "none"],
+          silent: true,
+          data: [],
         },
       },
     ],
