@@ -1116,10 +1116,10 @@ function updateCharts() {
 
   if (speedChart && speedPoints.length > 0) {
     const reliableSpeedData = speedPoints.map((p) =>
-      isUnreliableTs(p.timeMs) ? null : p.speed
+      isUnreliableTs(p.timeMs) ? null : [p.timeMs, p.speed]
     );
     const excludedSpeedData = speedPoints.map((p) =>
-      isUnreliableTs(p.timeMs) ? p.speed : null
+      isUnreliableTs(p.timeMs) ? [p.timeMs, p.speed] : null
     );
     console.log(
       "Updating speed chart with",
@@ -1133,10 +1133,24 @@ function updateCharts() {
         animationDuration: 0,
         animationDurationUpdate: 0,
         xAxis: {
-          data: speedPoints.map((p) => p.time),
+          type: "time",
+          name: "Time",
+          nameLocation: "middle",
+          nameTextStyle: {
+            padding: [8, 0, 0, 0],
+          },
+          inverse: true,
+          axisLabel: {
+            formatter: (value: number) => new Date(value).toLocaleTimeString(),
+          },
         },
         yAxis: {
+          type: "value",
           name: `Speed (${windSpeedUnitLabel.value})`,
+          nameLocation: "middle",
+          nameTextStyle: {
+            padding: [0, 0, 12, 0],
+          },
         },
         series: [
           {
@@ -1341,15 +1355,16 @@ function initCharts() {
       containLabel: true,
     },
     xAxis: {
-      type: "category",
+      type: "time",
       name: "Time",
-      // our data is sorted newest to oldest, we reverse it to show the graph with newest on the right
-      inverse: true,
       nameLocation: "middle",
       nameTextStyle: {
         padding: [8, 0, 0, 0],
       },
-      data: [],
+      inverse: true,
+      axisLabel: {
+        formatter: (value: number) => new Date(value).toLocaleTimeString(),
+      },
     },
     yAxis: {
       type: "value",
