@@ -423,7 +423,7 @@ function computeUnreliableRanges(
         eventTimes.push(midTime);
     }
     if (a.sensor_heading_deg != null && b.sensor_heading_deg != null) {
-      const avgSpeed = (a.sensor_speed_mps + b.sensor_speed_mps) / 2;
+      const avgSpeed = ((a.sensor_speed_mps ?? 0) + (b.sensor_speed_mps ?? 0)) / 2;
       if (avgSpeed > 1) {
         let dh = Math.abs(a.sensor_heading_deg - b.sensor_heading_deg);
         if (dh > 180) dh = 360 - dh;
