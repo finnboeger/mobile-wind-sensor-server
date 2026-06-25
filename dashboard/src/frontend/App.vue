@@ -6,6 +6,9 @@
         @click="
           pendingTimeFrame = timeFrameMinutes;
           pendingWindSpeedUnit = windSpeedUnit;
+          pendingSensorSpeedThreshold = roundOne(
+            convertWindSpeedFromMps(sensorSpeedThresholdMps, pendingWindSpeedUnit)
+          );
           pendingOldestAtTop = directionOldestAtTop;
           pendingExclusionWindowSec = exclusionWindowSec;
           pendingHideInvalidData = hideInvalidData;
@@ -126,6 +129,19 @@
         </div>
 
         <div class="settings-row">
+          <label for="sensor-speed-threshold-input"
+            >Sensor Speed Threshold ({{ pendingWindSpeedUnitLabel }})</label
+          >
+          <input
+            id="sensor-speed-threshold-input"
+            type="number"
+            min="0"
+            step="0.1"
+            v-model.number="pendingSensorSpeedThreshold"
+          />
+        </div>
+
+        <div class="settings-row">
           <label for="avg-window-select">Average window</label>
           <select
             id="avg-window-select"
@@ -188,8 +204,8 @@
               <div class="label">True Wind Speed</div>
               <div class="value">
                 {{
-                  latestMeasurement
-                    ? convertWindSpeed(latestMeasurement.true_wind_speed_mps).toFixed(
+                  latestDisplayMeasurement
+                    ? convertWindSpeed(latestDisplayMeasurement.true_wind_speed_mps).toFixed(
                         1
                       )
                     : "—"
@@ -200,7 +216,7 @@
             <div class="kpi-card">
               <div class="label">True Wind Direction</div>
               <div class="value">
-                {{ latestMeasurement?.true_wind_dir_deg?.toFixed(0) || "—" }}°
+                {{ latestDisplayMeasurement?.true_wind_dir_deg?.toFixed(0) || "—" }}°
               </div>
             </div>
             <div class="kpi-card">
@@ -265,6 +281,7 @@ const STORAGE_KEY = "windDashboardSettings";
 function loadStoredSettings(): {
   timeFrameMinutes: number;
   windSpeedUnit: WindSpeedUnit;
+  sensorSpeedThresholdMps: number;
   directionOldestAtTop: boolean;
   exclusionWindowSec: number;
   hideInvalidData: boolean;
@@ -278,6 +295,7 @@ function loadStoredSettings(): {
   const defaultSettings = {
     timeFrameMinutes: 30,
     windSpeedUnit: "knots",
+    sensorSpeedThresholdMps: 15 / 1.943844,
     directionOldestAtTop: false,
     exclusionWindowSec: 5,
     hideInvalidData: false,
@@ -291,11 +309,17 @@ function loadStoredSettings(): {
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw)
+    if (raw) {
+      const parsed = JSON.parse(raw) as any;
       return {
         ...defaultSettings,
-        ...JSON.parse(raw),
+        ...parsed,
+        sensorSpeedThresholdMps:
+          parsed.sensorSpeedThresholdMps ??
+          parsed.maxSensorSpeedMps ??
+          defaultSettings.sensorSpeedThresholdMps,
       };
+    }
   } catch {
     /* ignore */
   }
@@ -306,6 +330,14 @@ const timeFrameMinutes = ref(storedSettings.timeFrameMinutes);
 const settingsOpen = ref(false);
 const pendingTimeFrame = ref(timeFrameMinutes.value);
 const pendingWindSpeedUnit = ref<WindSpeedUnit>(storedSettings.windSpeedUnit);
+const pendingSensorSpeedThreshold = ref(
+  roundOne(
+    convertWindSpeedFromMps(
+      storedSettings.sensorSpeedThresholdMps,
+      storedSettings.windSpeedUnit
+    )
+  )
+);
 const pendingOldestAtTop = ref(storedSettings.directionOldestAtTop);
 const pendingExclusionWindowSec = ref(storedSettings.exclusionWindowSec);
 const pendingHideInvalidData = ref(storedSettings.hideInvalidData);
@@ -320,6 +352,7 @@ const pendingSmoothing = ref(storedSettings.smoothingWindowSec);
 
 // Set to true to render newest direction samples at the bottom.
 const windSpeedUnit = ref<WindSpeedUnit>(storedSettings.windSpeedUnit);
+const sensorSpeedThresholdMps = ref(storedSettings.sensorSpeedThresholdMps);
 const directionOldestAtTop = ref(storedSettings.directionOldestAtTop);
 const exclusionWindowSec = ref(storedSettings.exclusionWindowSec);
 const hideInvalidData = ref(storedSettings.hideInvalidData);
@@ -336,9 +369,43 @@ const windSpeedUnitLabel = computed(() => {
   return "m/s";
 });
 
+const pendingWindSpeedUnitLabel = computed(() => {
+  if (pendingWindSpeedUnit.value === "knots") return "kn";
+  if (pendingWindSpeedUnit.value === "kmh") return "km/h";
+  return "m/s";
+});
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function convertWindSpeedFromMps(speedMps: number, unit: WindSpeedUnit): number {
+  if (unit === "knots") return speedMps * 1.943844;
+  if (unit === "kmh") return speedMps * 3.6;
+  return speedMps;
+}
+
+function convertWindSpeedToMps(speed: number, unit: WindSpeedUnit): number {
+  if (unit === "knots") return speed / 1.943844;
+  if (unit === "kmh") return speed / 3.6;
+  return speed;
+}
+
+const filteredMeasurements = computed(() =>
+  measurements.value.filter(
+    (m) =>
+      m.sensor_speed_mps == null ||
+      m.sensor_speed_mps <= sensorSpeedThresholdMps.value
+  )
+);
+
+const latestDisplayMeasurement = computed<Measurement | null>(
+  () => filteredMeasurements.value[0] ?? null
+);
+
 const latestDataAgeSec = computed(() => {
-  if (!latestMeasurement.value?.ts) return null;
-  const ageMs = nowMs.value - new Date(latestMeasurement.value.ts).getTime();
+  if (!latestDisplayMeasurement.value?.ts) return null;
+  const ageMs = nowMs.value - new Date(latestDisplayMeasurement.value.ts).getTime();
   return Math.max(0, Math.floor(ageMs / 1000));
 });
 
@@ -381,9 +448,7 @@ const staleDataNotice = computed(() => {
 });
 
 function convertWindSpeed(speedMps: number): number {
-  if (windSpeedUnit.value === "knots") return speedMps * 1.943844;
-  if (windSpeedUnit.value === "kmh") return speedMps * 3.6;
-  return speedMps;
+  return convertWindSpeedFromMps(speedMps, windSpeedUnit.value);
 }
 
 function formatSpeed(speedMps?: number): string {
@@ -397,12 +462,13 @@ function formatDirection(deg?: number): string {
 }
 
 function getClosestMeasurementByTimeMs(timeMs: number): Measurement | null {
-  if (!Number.isFinite(timeMs) || measurements.value.length === 0) return null;
+  if (!Number.isFinite(timeMs) || filteredMeasurements.value.length === 0)
+    return null;
 
   let closest: Measurement | null = null;
   let closestDiff = Number.POSITIVE_INFINITY;
 
-  for (const m of measurements.value) {
+  for (const m of filteredMeasurements.value) {
     const mTs = new Date(m.ts).getTime();
     const diff = Math.abs(mTs - timeMs);
     if (diff < closestDiff) {
@@ -470,10 +536,10 @@ function getTooltipMeasurement(paramsOrParam: any): Measurement | null {
     (p) =>
       typeof p.dataIndex === "number" &&
       p.dataIndex >= 0 &&
-      p.dataIndex < measurements.value.length
+      p.dataIndex < filteredMeasurements.value.length
   );
   if (indexedParam) {
-    return measurements.value[indexedParam.dataIndex];
+    return filteredMeasurements.value[indexedParam.dataIndex];
   }
 
   // Axis-trigger fallback (for time axis values on direction chart).
@@ -621,11 +687,12 @@ const smoothingSamples = computed(() => Math.max(1, smoothingWindowSec.value - 4
 
 // Average of true_wind_dir_deg and true_wind_speed_mps over the last avgWindowMinutes
 const averageMeasurement = computed(() => {
-  if (!latestMeasurement.value || measurements.value.length === 0) return null;
+  if (!latestDisplayMeasurement.value || filteredMeasurements.value.length === 0)
+    return null;
   const cutoff =
-    new Date(latestMeasurement.value.ts).getTime() -
+    new Date(latestDisplayMeasurement.value.ts).getTime() -
     avgWindowMinutes.value * 60 * 1000;
-  const window = measurements.value.filter(
+  const window = filteredMeasurements.value.filter(
     (m) => new Date(m.ts).getTime() >= cutoff
   );
   if (window.length === 0) return null;
@@ -704,6 +771,15 @@ async function applySettings() {
 
   timeFrameMinutes.value = pendingTimeFrame.value;
   windSpeedUnit.value = pendingWindSpeedUnit.value;
+  sensorSpeedThresholdMps.value = Math.max(
+    0,
+    convertWindSpeedToMps(
+      Number.isFinite(pendingSensorSpeedThreshold.value)
+        ? pendingSensorSpeedThreshold.value
+        : 0,
+      pendingWindSpeedUnit.value
+    )
+  );
   directionOldestAtTop.value = pendingOldestAtTop.value;
   exclusionWindowSec.value = pendingExclusionWindowSec.value;
   hideInvalidData.value = pendingHideInvalidData.value;
@@ -721,6 +797,7 @@ async function applySettings() {
     JSON.stringify({
       timeFrameMinutes: timeFrameMinutes.value,
       windSpeedUnit: windSpeedUnit.value,
+      sensorSpeedThresholdMps: sensorSpeedThresholdMps.value,
       directionOldestAtTop: directionOldestAtTop.value,
       exclusionWindowSec: exclusionWindowSec.value,
       hideInvalidData: hideInvalidData.value,
@@ -954,8 +1031,8 @@ function handleTabRefocus() {
 }
 
 function updateTime() {
-  if (latestMeasurement.value?.ts) {
-    const date = new Date(latestMeasurement.value.ts);
+  if (latestDisplayMeasurement.value?.ts) {
+    const date = new Date(latestDisplayMeasurement.value.ts);
     lastUpdateTime.value = date.toLocaleTimeString();
   }
 }
@@ -965,13 +1042,15 @@ function updateCharts() {
     return;
   }
 
-  if (measurements.value.length === 0) {
+  const visibleMeasurements = filteredMeasurements.value;
+
+  if (visibleMeasurements.length === 0) {
     console.log("No measurements to chart");
     return;
   }
 
   // Wind direction chart (x = direction, y = time)
-  const rawDirectionPoints = measurements.value.map((m) => ({
+  const rawDirectionPoints = visibleMeasurements.map((m) => ({
     direction: m.true_wind_dir_deg,
     timeMs: new Date(m.ts).getTime(),
   }));
@@ -979,7 +1058,7 @@ function updateCharts() {
 
   // Compute unreliable ranges once for use in both charts
   const unreliableRanges = computeUnreliableRanges(
-    measurements.value,
+    visibleMeasurements,
     exclusionWindowSec.value * 1000
   );
 
@@ -1234,7 +1313,7 @@ function updateCharts() {
   }
 
   // Wind speed chart
-  const rawSpeedPoints = measurements.value.map((m) => ({
+  const rawSpeedPoints = visibleMeasurements.map((m) => ({
     speed: convertWindSpeed(m.true_wind_speed_mps),
     time: new Date(m.ts).toLocaleTimeString(),
     timeMs: new Date(m.ts).getTime(),
@@ -1608,6 +1687,17 @@ watch(loading, async (isLoading) => {
     chartsReady.value = true;
     updateCharts();
   }
+});
+
+watch(pendingWindSpeedUnit, (newUnit, oldUnit) => {
+  if (!settingsOpen.value) return;
+  const prevMps = convertWindSpeedToMps(
+    pendingSensorSpeedThreshold.value,
+    oldUnit
+  );
+  pendingSensorSpeedThreshold.value = roundOne(
+    convertWindSpeedFromMps(prevMps, newUnit)
+  );
 });
 </script>
 
