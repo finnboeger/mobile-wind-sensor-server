@@ -430,6 +430,20 @@ function getHoveredTimeMsFromTooltipParams(paramsOrParam: any): number | null {
   return parseTsMs(measurement?.ts);
 }
 
+function getHoverSourceFromTooltipParams(
+  paramsOrParam: any
+): "direction" | "speed" | null {
+  const params = Array.isArray(paramsOrParam)
+    ? paramsOrParam
+    : [paramsOrParam];
+  const usableParam = params.find((p) => p && p.componentSubType !== "markLine");
+  if (!usableParam || typeof usableParam.seriesName !== "string") return null;
+
+  if (usableParam.seriesName.startsWith("Direction")) return "direction";
+  if (usableParam.seriesName.startsWith("Wind Speed")) return "speed";
+  return null;
+}
+
 function getDirectionHoverMarkLineData(): Array<Record<string, unknown>> {
   if (hoveredTimeMs == null) return [];
   return [
@@ -449,11 +463,9 @@ function getDirectionHoverMarkLineData(): Array<Record<string, unknown>> {
 
 function getSpeedHoverMarkLineData(): Array<Record<string, unknown>> {
   if (hoveredTimeMs == null) return [];
-  const nearest = getNearestSpeedPointByTimeMs(hoveredTimeMs);
-  if (!nearest) return [];
   return [
     {
-      xAxis: nearest.time,
+      xAxis: hoveredTimeMs,
       lineStyle: {
         color: "#2f855a",
         type: "dashed",
@@ -475,14 +487,31 @@ function syncHoverTimeLines(): void {
   });
 }
 
-function setHoveredTimeMs(timeMs: number | null): void {
+function setHoveredTimeMs(
+  timeMs: number | null,
+  source: "direction" | "speed" | null = null
+): void {
   if (hoveredTimeMs === timeMs) return;
   hoveredTimeMs = timeMs;
+  if (timeMs == null) {
+    hoveredSource = null;
+  } else if (source != null) {
+    hoveredSource = source;
+  }
   syncHoverTimeLines();
 }
 
+function clearHoverFromSource(source: "direction" | "speed"): void {
+  if (hoveredSource === source) {
+    setHoveredTimeMs(null);
+  }
+}
+
 function buildMeasurementTooltip(paramsOrParam: any): string {
-  setHoveredTimeMs(getHoveredTimeMsFromTooltipParams(paramsOrParam));
+  setHoveredTimeMs(
+    getHoveredTimeMsFromTooltipParams(paramsOrParam),
+    getHoverSourceFromTooltipParams(paramsOrParam)
+  );
   const measurement = getTooltipMeasurement(paramsOrParam);
   if (!measurement) return "No measurement available";
 
@@ -660,6 +689,7 @@ let directionChart: echarts.ECharts | null = null;
 let speedChart: echarts.ECharts | null = null;
 let backfillInProgress = false;
 let hoveredTimeMs: number | null = null;
+let hoveredSource: "direction" | "speed" | null = null;
 let latestSpeedPoints: Array<{ time: string; timeMs: number }> = [];
 
 const DATA_GAP_THRESHOLD_MS = 2_000;
@@ -1219,7 +1249,7 @@ function initCharts() {
   // Wind direction chart
   directionChart = echarts.init(dirContainer);
   directionChart.on("globalout", () => {
-    setHoveredTimeMs(null);
+    clearHoverFromSource("direction");
   });
   directionChart.setOption({
     animation: false,
@@ -1373,7 +1403,7 @@ function initCharts() {
   // Wind speed chart
   speedChart = echarts.init(speedContainer);
   speedChart.on("globalout", () => {
-    setHoveredTimeMs(null);
+    clearHoverFromSource("speed");
   });
   speedChart.setOption({
     animation: false,
