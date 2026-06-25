@@ -640,6 +640,8 @@ function computeUnreliableRanges(
 }
 
 async function applySettings() {
+  const prevTimeFrameMinutes = timeFrameMinutes.value;
+
   timeFrameMinutes.value = pendingTimeFrame.value;
   windSpeedUnit.value = pendingWindSpeedUnit.value;
   directionOldestAtTop.value = pendingOldestAtTop.value;
@@ -681,7 +683,23 @@ async function applySettings() {
   await nextTick();
   initCharts();
   chartsReady.value = true;
-  await loadMeasurements();
+
+  if (timeFrameMinutes.value > prevTimeFrameMinutes) {
+    // Only fetch more data when the requested window grew.
+    await loadMeasurements();
+    return;
+  }
+
+  if (latestMeasurement.value?.ts) {
+    const newestTsMs = new Date(latestMeasurement.value.ts).getTime();
+    const cutoffMs = newestTsMs - timeFrameMinutes.value * 60 * 1000;
+    measurements.value = measurements.value.filter(
+      (m) => new Date(m.ts).getTime() > cutoffMs
+    );
+  }
+
+  updateCharts();
+  updateTime();
 }
 
 let pb: PocketBase;
