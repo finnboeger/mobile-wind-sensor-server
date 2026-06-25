@@ -445,15 +445,24 @@ function getTooltipMeasurement(paramsOrParam: any): Measurement | null {
   );
   if (usableParams.length === 0) return null;
 
-  // Direction chart data points are [direction, timeMs].
+  // Resolve time from series payload shape:
+  // - direction points: [direction, timeMs]
+  // - speed points: [timeMs, speed]
   const timePointParam = usableParams.find(
-    (p) =>
-      Array.isArray(p.data) &&
-      p.data.length >= 2 &&
-      typeof p.data[1] === "number"
+    (p) => Array.isArray(p.data) && p.data.length >= 2
   );
-  if (timePointParam) {
-    return getClosestMeasurementByTimeMs(timePointParam.data[1]);
+  if (timePointParam && Array.isArray(timePointParam.data)) {
+    if (
+      typeof timePointParam.seriesName === "string" &&
+      timePointParam.seriesName.startsWith("Wind Speed") &&
+      typeof timePointParam.data[0] === "number"
+    ) {
+      return getClosestMeasurementByTimeMs(timePointParam.data[0]);
+    }
+
+    if (typeof timePointParam.data[1] === "number") {
+      return getClosestMeasurementByTimeMs(timePointParam.data[1]);
+    }
   }
 
   // Speed chart points align 1:1 with measurements by dataIndex.
@@ -1258,7 +1267,6 @@ function updateCharts() {
           nameTextStyle: {
             padding: [8, 0, 0, 0],
           },
-          inverse: true,
           axisLabel: {
             formatter: (value: number) => new Date(value).toLocaleTimeString(),
           },
@@ -1501,7 +1509,6 @@ function initCharts() {
       nameTextStyle: {
         padding: [8, 0, 0, 0],
       },
-      inverse: true,
       axisLabel: {
         formatter: (value: number) => new Date(value).toLocaleTimeString(),
       },
