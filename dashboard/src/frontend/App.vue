@@ -22,6 +22,12 @@
         ⚙
       </button>
       <div v-if="error" class="error-banner">{{ error }}</div>
+      <div
+        v-if="staleDataNotice"
+        :class="['stale-banner', staleAlertLevel === 'error' ? 'stale-error' : 'stale-warning']"
+      >
+        {{ staleDataNotice }}
+      </div>
     </header>
 
     <!-- Settings popup -->
@@ -177,7 +183,7 @@
     <main v-if="!loading" class="content">
       <div class="charts">
         <div class="left-column">
-          <div class="kpi-cards">
+          <div class="kpi-cards" :class="kpiValueAgeClass">
             <div class="kpi-card">
               <div class="label">True Wind Speed</div>
               <div class="value">
@@ -254,6 +260,7 @@ const latestMeasurement = ref<Measurement | null>(null);
 const measurements = ref<Measurement[]>([]);
 const lastUpdateTime = ref("");
 const chartsReady = ref(false);
+const nowMs = ref(Date.now());
 const STORAGE_KEY = "windDashboardSettings";
 function loadStoredSettings(): {
   timeFrameMinutes: number;
@@ -327,6 +334,50 @@ const windSpeedUnitLabel = computed(() => {
   if (windSpeedUnit.value === "knots") return "kn";
   if (windSpeedUnit.value === "kmh") return "km/h";
   return "m/s";
+});
+
+const latestDataAgeSec = computed(() => {
+  if (!latestMeasurement.value?.ts) return null;
+  const ageMs = nowMs.value - new Date(latestMeasurement.value.ts).getTime();
+  return Math.max(0, Math.floor(ageMs / 1000));
+});
+
+function formatDataAge(ageSec: number): string {
+  if (ageSec >= 3600) {
+    const hours = Math.floor(ageSec / 3600);
+    const minutes = Math.floor((ageSec % 3600) / 60);
+    const seconds = ageSec % 60;
+    return `${hours}h${String(minutes).padStart(2, "0")}m${String(seconds).padStart(2, "0")}s`;
+  }
+
+  if (ageSec >= 60) {
+    const minutes = Math.floor(ageSec / 60);
+    const seconds = ageSec % 60;
+    return `${minutes}m${String(seconds).padStart(2, "0")}s`;
+  }
+
+  return `${ageSec}s`;
+}
+
+const kpiValueAgeClass = computed(() => {
+  const ageSec = latestDataAgeSec.value;
+  if (ageSec == null) return "";
+  if (ageSec > 150) return "kpi-stale-error";
+  if (ageSec > 30) return "kpi-stale-warning";
+  return "";
+});
+
+const staleAlertLevel = computed<"warning" | "error" | null>(() => {
+  const ageSec = latestDataAgeSec.value;
+  if (ageSec == null || ageSec <= 60) return null;
+  if (ageSec > 150) return "error";
+  return "warning";
+});
+
+const staleDataNotice = computed(() => {
+  const ageSec = latestDataAgeSec.value;
+  if (ageSec == null || ageSec <= 60) return "";
+  return `Latest data is ${formatDataAge(ageSec)} old.`;
 });
 
 function convertWindSpeed(speedMps: number): number {
@@ -709,6 +760,7 @@ let backfillInProgress = false;
 let hoveredTimeMs: number | null = null;
 let hoveredSource: "direction" | "speed" | null = null;
 let latestSpeedPoints: Array<{ time: string; timeMs: number }> = [];
+let staleAgeTimerId: number | null = null;
 
 const DATA_GAP_THRESHOLD_MS = 2_000;
 
@@ -1525,12 +1577,19 @@ function initCharts() {
 onMounted(() => {
   document.addEventListener("visibilitychange", handleTabRefocus);
   window.addEventListener("focus", handleTabRefocus);
+  staleAgeTimerId = window.setInterval(() => {
+    nowMs.value = Date.now();
+  }, 1000);
   initializePocketBase();
 });
 
 onUnmounted(() => {
   document.removeEventListener("visibilitychange", handleTabRefocus);
   window.removeEventListener("focus", handleTabRefocus);
+  if (staleAgeTimerId != null) {
+    window.clearInterval(staleAgeTimerId);
+    staleAgeTimerId = null;
+  }
 });
 
 // Initialize charts once content becomes visible
@@ -1580,6 +1639,23 @@ watch(loading, async (isLoading) => {
   margin-top: 10px;
 }
 
+.stale-banner {
+  padding: 13px 20px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-weight: 600;
+}
+
+.stale-banner.stale-warning {
+  background: rgba(255, 165, 0, 0.18);
+  color: #8a4b00;
+}
+
+.stale-banner.stale-error {
+  background: rgba(220, 38, 38, 0.2);
+  color: #991b1b;
+}
+
 .content {
   animation: fadeIn 0.5s ease-in-out;
   display: flex;
@@ -1621,6 +1697,14 @@ watch(loading, async (isLoading) => {
   font-size: 2rem;
   color: #333;
   font-weight: bold;
+}
+
+.kpi-cards.kpi-stale-warning .kpi-card .value {
+  color: #b45309;
+}
+
+.kpi-cards.kpi-stale-error .kpi-card .value {
+  color: #b91c1c;
 }
 
 .charts {
