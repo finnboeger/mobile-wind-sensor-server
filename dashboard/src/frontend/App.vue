@@ -1025,10 +1025,29 @@ function updateCharts() {
           {
             min: axisMin,
             max: axisMax,
+            axisPointer: {
+              label: {
+                formatter: (params: any) => {
+                  const value = Number(params?.value);
+                  const normalized = ((value % 360) + 360) % 360;
+                  return `${Math.round(normalized)}`;
+                },
+              },
+            },
           },
           {
             min: Math.floor(axisMin - avgDirection),
             max: Math.ceil(axisMax - avgDirection),
+            axisPointer: {
+              label: {
+                formatter: (params: any) => {
+                  const value = Number(params?.value);
+                  const rounded = Math.round(value);
+                  if (rounded >= 0) return `+${rounded}`;
+                  return `${rounded}`;
+                },
+              },
+            },
             splitLine: {
               lineStyle: {
                 type: [5, 10],
@@ -1234,7 +1253,17 @@ function initCharts() {
         position: "top",
         axisLabel: {
           formatter: (value: number) => {
-            return `${(value + 360) % 360}`;
+            const normalized = ((value % 360) + 360) % 360;
+            return `${Math.round(normalized)}`;
+          },
+        },
+        axisPointer: {
+          label: {
+            formatter: (params: any) => {
+              const value = Number(params?.value);
+              const normalized = ((value % 360) + 360) % 360;
+              return `${Math.round(normalized)}`;
+            },
           },
         },
       },
@@ -1250,13 +1279,24 @@ function initCharts() {
         position: "bottom",
         axisLabel: {
           formatter: (value: number) => {
-            if (value == 0) {
-              return "";
+            const rounded = Math.round(value);
+            if (rounded === 0) {
+              return "0";
             }
-            if (value > 0) {
-              return `+${value}`;
+            if (rounded > 0) {
+              return `+${rounded}`;
             }
-            return `${value}`;
+            return `${rounded}`;
+          },
+        },
+        axisPointer: {
+          label: {
+            formatter: (params: any) => {
+              const value = Number(params?.value);
+              const rounded = Math.round(value);
+              if (rounded >= 0) return `+${rounded}`;
+              return `${rounded}`;
+            },
           },
         },
       },
