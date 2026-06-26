@@ -33,6 +33,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 mqtt_listener: MqttListener
+MAX_WRITE_ATTEMPTS = 3
+RETRY_BASE_DELAY_SECONDS = 1.0
+RETRY_MAX_DELAY_SECONDS = 8.0
 
 
 def shutdown_handler(signum, frame):
@@ -45,7 +48,49 @@ def shutdown_handler(signum, frame):
 def process_queue(output_queue: Queue, pocketbase_writer: PocketbaseWriter):
     while True:
         measurement = output_queue.get()
-        pocketbase_writer.write_measurement(measurement)
+        source_id = measurement.get("source_id", "unknown")
+        timestamp = measurement.get("ts", "unknown")
+
+        try:
+            for attempt in range(1, MAX_WRITE_ATTEMPTS + 1):
+                try:
+                    pocketbase_writer.write_measurement(measurement)
+                    if attempt > 1:
+                        logger.info(
+                            "Write recovered on attempt %s/%s for source_id=%s ts=%s",
+                            attempt,
+                            MAX_WRITE_ATTEMPTS,
+                            source_id,
+                            timestamp,
+                        )
+                    break
+                except Exception as e:
+                    if attempt == MAX_WRITE_ATTEMPTS:
+                        logger.error(
+                            "Skipping measurement after %s failed attempts for source_id=%s ts=%s: %s",
+                            MAX_WRITE_ATTEMPTS,
+                            source_id,
+                            timestamp,
+                            e,
+                        )
+                        break
+
+                    delay_seconds = min(
+                        RETRY_BASE_DELAY_SECONDS * (2 ** (attempt - 1)),
+                        RETRY_MAX_DELAY_SECONDS,
+                    )
+                    logger.warning(
+                        "Write attempt %s/%s failed for source_id=%s ts=%s; retrying in %.1fs: %s",
+                        attempt,
+                        MAX_WRITE_ATTEMPTS,
+                        source_id,
+                        timestamp,
+                        delay_seconds,
+                        e,
+                    )
+                    time.sleep(delay_seconds)
+        finally:
+            output_queue.task_done()
 
 
 def main():
