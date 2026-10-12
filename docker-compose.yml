@@ -79,6 +79,7 @@ services:
       MQTT_PORT: ${MQTT_PORT:-1883}
       MQTT_USER: ${MQTT_USER:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_USE_TLS: ${MQTT_USE_TLS:-true}
       MQTT_TOPICS: ${MQTT_TOPICS:-wind/sensor1=sensor_1,wind/sensor2=sensor_2}
 
       # PocketBase configuration
@@ -98,16 +99,17 @@ services:
       - wind-network
     restart: unless-stopped
 
-  # Optional: Mosquitto MQTT broker (for testing)
+  # Mosquitto MQTT broker: boats connect over TLS on 8883, mqtt-ingestion
+  # uses the plain 1883 listener inside the docker network.
+  # Setup: see "Self-hosted MQTT broker" in README.md
   mosquitto:
-    image: eclipse-mosquitto:latest
+    image: eclipse-mosquitto:2
     container_name: wind-mosquitto
     ports:
-      - "${MOSQUITTO_PORT:-1883}:1883"
+      - "${MOSQUITTO_TLS_PORT:-8883}:8883"
     volumes:
-      - mosquitto_config:/mosquitto/config
-      - mosquitto_data:/mosquitto/data
-      - mosquitto_logs:/mosquitto/log
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/certs:/mosquitto/certs:ro
     environment:
       - TZ=${TZ:-UTC}
     networks:
@@ -122,6 +124,3 @@ networks:
 volumes:
   pocketbase_data:
   pocketbase_migrations:
-  mosquitto_config:
-  mosquitto_data:
-  mosquitto_logs:

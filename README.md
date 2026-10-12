@@ -323,6 +323,48 @@ docker-compose logs -f dashboard-server
 docker-compose down -v
 ```
 
+### Self-hosted MQTT broker
+
+The stack includes a Mosquitto broker (`mosquitto` service). The boats connect
+to it over TLS on port 8883; `mqtt-ingestion` connects to the plain listener on
+port 1883, which is only reachable inside the docker network.
+
+1. Point a DNS name (e.g. `mqtt.example.com`) at the server and open TCP 8883
+   (and TCP 80 for the certificate challenge).
+2. Get a Let's Encrypt certificate and copy it to `mosquitto/certs/` on every
+   renewal:
+   ```bash
+   sudo certbot certonly --standalone -d mqtt.example.com \
+     --deploy-hook "$PWD/mosquitto/certs/renew-hook.sh"
+   sudo RENEWED_LINEAGE=/etc/letsencrypt/live/mqtt.example.com ./mosquitto/certs/renew-hook.sh
+   ```
+   If something already serves port 80 (a reverse proxy), use
+   `--webroot` or a DNS challenge instead of `--standalone`.
+3. Create one user for the ingestion service and one per boat, and give each
+   boat its topic in `mosquitto/config/acl`:
+   ```bash
+   ./mosquitto/add-user.sh ingestion
+   ./mosquitto/add-user.sh bot1
+   ```
+4. Configure the ingestion service in `.env`:
+   ```bash
+   MQTT_HOST=mosquitto
+   MQTT_PORT=1883
+   MQTT_USE_TLS=false
+   MQTT_USER=ingestion
+   MQTT_PASSWORD=...
+   MQTT_TOPICS=bot1=bot1
+   ```
+5. `docker compose up -d`, then on each boat set in `config.ini`:
+   ```ini
+   [MQTT]
+   BROKER = mqtt.example.com
+   PORT = 8883
+   USERNAME = bot1
+   PASSWORD = ...
+   TOPIC = bot1
+   ```
+
 ### Bare-Metal Deployment
 
 See [BARE_METAL_DEPLOYMENT.md](BARE_METAL_DEPLOYMENT.md) for systemd/launchd setup.

@@ -56,3 +56,6 @@ htmlcov/
 dmypy.json
 .pyre/
 *.tar.gz
+# Mosquitto secrets
+mosquitto/config/passwd
+mosquitto/certs/*.pem
