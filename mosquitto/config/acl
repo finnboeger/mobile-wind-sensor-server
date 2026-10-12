@@ -1,0 +1,11 @@
+# Access control for Mosquitto. Users are created in passwd with
+#   ./mosquitto/add-user.sh <user>
+#
+# Each boat may only publish to its own topic (the TOPIC in the client's
+# config.ini); the ingestion service may read everything.
+
+user ingestion
+topic read #
+
+user bot1
+topic write bot1
