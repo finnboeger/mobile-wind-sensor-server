@@ -20,6 +20,8 @@ class MqttConfig:
         self.mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
         self.mqtt_user = os.getenv("MQTT_USER")
         self.mqtt_password = os.getenv("MQTT_PASSWORD")
+        # TLS is on by default; turn it off for a broker on the internal docker network
+        self.mqtt_use_tls = os.getenv("MQTT_USE_TLS", "true").strip().lower() not in ("false", "0", "no")
 
         # Parse MQTT topics
         mqtt_topics_str = os.getenv("MQTT_TOPICS")

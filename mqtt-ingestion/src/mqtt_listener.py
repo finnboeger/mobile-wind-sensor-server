@@ -34,7 +34,8 @@ class MqttListener:
             userdata=None,
             protocol=mqtt.MQTTv5,
         )
-        self.client.tls_set(tls_version=PROTOCOL_TLS)
+        if self.mqtt_config.mqtt_use_tls:
+            self.client.tls_set(tls_version=PROTOCOL_TLS)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
