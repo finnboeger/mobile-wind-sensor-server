@@ -43,6 +43,14 @@ class FakeReader:
         )
         return matches[:limit]
 
+    def iter_range(self, source_id, after, until, page_size=200):
+        matches = sorted(
+            (r for r in self.records if r["source_id"] == source_id and after < r["ts"] <= until),
+            key=lambda r: r["ts"],
+        )
+        for i in range(0, len(matches), page_size):
+            yield matches[i : i + page_size]
+
 
 class FakeSap:
     def __init__(self):
@@ -152,6 +160,13 @@ class UplinkTest(unittest.TestCase):
 
         self.assertTrue(uplink.poll_once())
         self.assertEqual([(w, len(f)) for w, f in self.sap.calls], [("windbot1", 3), ("windbot2", 1)])
+
+    def test_backfill_sends_range_without_moving_cursor(self):
+        self.reader.records = [measurement(s) for s in range(-10, 0)]
+        uplink = self.make_uplink()
+        uplink.backfill(T0 - timedelta(seconds=5), T0)
+        self.assertEqual(self.sap.timepoints, [timepoint(s) for s in range(-4, 0)])
+        self.assertEqual(uplink.cursors["sensor_1"], ts(0))
 
     def test_sources_are_independent(self):
         self.reader.records = [measurement(1), measurement(1, source_id="sensor_2")]
