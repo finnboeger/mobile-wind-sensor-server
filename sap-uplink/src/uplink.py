@@ -12,6 +12,7 @@ import json
 import logging
 import math
 import os
+import queue
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
@@ -24,6 +25,11 @@ from src.sap_client import SapClient, SapRejectedError
 logger = logging.getLogger(__name__)
 
 MAX_BACKOFF_SECONDS = 300
+# First retry delay; shorter than the poll interval when realtime makes polling rare
+RETRY_BASE_SECONDS = 5
+
+# Put on the wake-up queue to forward every source (e.g. after a realtime reconnect)
+ALL_SOURCES = None
 
 # Returns the races to send to: a list ({regattaName, raceName}), or None for
 # "no list" (SAP picks every tracked race the login may update)
@@ -91,10 +97,34 @@ class Uplink:
 
     # ------------------------------------------------------------------- loop
 
-    def run_forever(self) -> None:
+    def run_forever(self, wakeups: Optional["queue.Queue[Optional[str]]"] = None) -> None:
+        """
+        Poll every source each poll interval. With a wake-up queue (fed by the
+        realtime listener) a source is also forwarded as soon as its id arrives
+        on it, and every source when ALL_SOURCES arrives.
+        """
+        next_poll = 0.0
         while True:
-            if not self.poll_once():
-                time.sleep(self.config.poll_seconds)
+            if wakeups is None:
+                if not self.poll_once():
+                    time.sleep(self.config.poll_seconds)
+                continue
+            if time.monotonic() >= next_poll:
+                backlog = self.poll_once()
+                # With a backlog, poll again right away instead of waiting
+                next_poll = time.monotonic() + (0 if backlog else self.config.poll_seconds)
+            try:
+                source_id = wakeups.get(timeout=max(0.0, next_poll - time.monotonic()))
+            except queue.Empty:
+                continue
+            if source_id is ALL_SOURCES:
+                backlog = self.poll_once()
+            elif source_id in self.config.sources:
+                backlog = self.forward_source(source_id)
+            else:
+                backlog = False
+            if backlog:
+                next_poll = time.monotonic()
 
     def poll_once(self) -> bool:
         """
@@ -104,23 +134,32 @@ class Uplink:
         """
         backlog = False
         for source_id in self.config.sources:
-            if time.monotonic() < self.retry_at.get(source_id, 0):
-                continue
-            try:
-                backlog = self.forward_new(source_id) or backlog
-            except Exception as e:
-                failures = self.failures.get(source_id, 0) + 1
-                self.failures[source_id] = failures
-                delay = self.backoff_seconds(failures)
-                self.retry_at[source_id] = time.monotonic() + delay
-                logger.warning(f"{source_id}: upload failed ({failures} in a row), retrying in {delay:.0f}s: {e}")
-            else:
-                self.failures[source_id] = 0
+            backlog = self.forward_source(source_id) or backlog
+        return backlog
+
+    def forward_source(self, source_id: str) -> bool:
+        """
+        forward_new with per-source backoff: a source that failed waits until
+        retry_at. True if the source may have more waiting.
+        """
+        if time.monotonic() < self.retry_at.get(source_id, 0):
+            return False
+        try:
+            backlog = self.forward_new(source_id)
+        except Exception as e:
+            failures = self.failures.get(source_id, 0) + 1
+            self.failures[source_id] = failures
+            delay = self.backoff_seconds(failures)
+            self.retry_at[source_id] = time.monotonic() + delay
+            logger.warning(f"{source_id}: upload failed ({failures} in a row), retrying in {delay:.0f}s: {e}")
+            return False
+        self.failures[source_id] = 0
         return backlog
 
     def backoff_seconds(self, failures: int) -> float:
-        max_exponent = max(0, math.ceil(math.log2(MAX_BACKOFF_SECONDS / self.config.poll_seconds)))
-        return min(self.config.poll_seconds * 2 ** min(failures, max_exponent), MAX_BACKOFF_SECONDS)
+        base = min(self.config.poll_seconds, RETRY_BASE_SECONDS)
+        max_exponent = max(0, math.ceil(math.log2(MAX_BACKOFF_SECONDS / base)))
+        return min(base * 2 ** min(failures, max_exponent), MAX_BACKOFF_SECONDS)
 
     def forward_new(self, source_id: str) -> bool:
         """Send the next batch stored after the cursor; True if more may be waiting."""

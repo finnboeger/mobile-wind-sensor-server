@@ -95,7 +95,10 @@ class UplinkConfig:
             raise ValueError(f"SAP_WIND_SOURCE_TYPE must be one of {', '.join(WIND_SOURCE_TYPES)}")
 
         # Upload behaviour
-        self.poll_seconds = float(os.getenv("SAP_POLL_SECONDS", "5"))
+        # With realtime, new measurements wake the service right away and polling
+        # is only the fallback, so it can be rarer
+        self.realtime = os.getenv("SAP_REALTIME", "true").strip().lower() in ("1", "true", "yes")
+        self.poll_seconds = float(os.getenv("SAP_POLL_SECONDS") or ("30" if self.realtime else "5"))
         self.batch_size = int(os.getenv("SAP_BATCH_SIZE", "200"))
         self.request_timeout_seconds = float(os.getenv("SAP_REQUEST_TIMEOUT_SECONDS", "30"))
 

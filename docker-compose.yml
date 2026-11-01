@@ -136,7 +136,8 @@ services:
       SAP_ALL_RACES: ${SAP_ALL_RACES:-false}
       SAP_WIND_SOURCE_TYPE: ${SAP_WIND_SOURCE_TYPE:-EXPEDITION}
       SAP_START_FROM: ${SAP_START_FROM:-}
-      SAP_POLL_SECONDS: ${SAP_POLL_SECONDS:-5}
+      SAP_REALTIME: ${SAP_REALTIME:-true}
+      SAP_POLL_SECONDS: ${SAP_POLL_SECONDS:-}
       SAP_BATCH_SIZE: ${SAP_BATCH_SIZE:-200}
 
       # PocketBase configuration (measurements are publicly readable)
