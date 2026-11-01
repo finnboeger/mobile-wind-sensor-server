@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 
 from src.config import UplinkConfig, parse_timestamp
 from src.pocketbase_reader import PocketbaseReader
+from src.race_finder import RaceFinder
 from src.sap_client import SapClient
 from src.uplink import CursorStore, Uplink
 
@@ -68,8 +69,18 @@ def main():
             bearer_token=config.sap_bearer_token,
             timeout_seconds=config.request_timeout_seconds,
         )
+        finder = None
         if config.races:
             races_provider = lambda: config.races
+        elif config.event_id:
+            finder = RaceFinder(
+                sap,
+                config.event_id,
+                config.course_area,
+                refresh_seconds=config.race_refresh_seconds,
+                finished_grace_seconds=config.finished_grace_seconds,
+            )
+            races_provider = finder.current_races
         else:
             races_provider = lambda: None
         uplink = Uplink(config, reader, sap, CursorStore(config.state_file), races_provider)
@@ -82,13 +93,22 @@ def main():
         if config.races:
             races = ", ".join(f"{r['regattaName']} / {r['raceName']}" for r in config.races)
             logger.info(f"Races: {races}")
+        elif finder:
+            area = f"course area '{config.course_area}'" if config.course_area else "all course areas"
+            logger.info(f"Races: current races of event {config.event_id}, {area}")
         else:
             logger.warning("Races: every tracked race this login may update (SAP_ALL_RACES=true)")
 
         if args.backfill:
             start = parse_timestamp(args.backfill)
             end = parse_timestamp(args.until) if args.until else datetime.now(timezone.utc)
-            uplink.backfill(start, end)
+            # The races running back then may be finished by now: offer every tracked
+            # race, SAP only keeps the fixes inside each race's tracking interval
+            backfill_races = None
+            if finder:
+                tracked = finder.all_tracked_races()
+                backfill_races = lambda: tracked
+            uplink.backfill(start, end, backfill_races)
             logger.info(f"✓ Backfill done: {uplink.stats}")
             return
 

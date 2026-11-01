@@ -24,6 +24,14 @@ class ConfigTest(unittest.TestCase):
             load()
         self.assertTrue(load(SAP_ALL_RACES="true").all_races)
 
+    def test_event_mode(self):
+        config = load(SAP_EVENT_ID="e74bea92", SAP_COURSE_AREA="Default")
+        self.assertEqual((config.event_id, config.course_area, config.races), ("e74bea92", "Default", None))
+
+    def test_course_area_needs_event(self):
+        with self.assertRaises(ValueError):
+            load(SAP_COURSE_AREA="Default")
+
     def test_parses_races(self):
         config = load(SAP_RACES='[{"regattaName":"Windbot Test","raceName":"Windbot Test R1 Default"}]')
         self.assertEqual(config.races, [{"regattaName": "Windbot Test", "raceName": "Windbot Test R1 Default"}])
