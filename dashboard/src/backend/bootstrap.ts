@@ -119,7 +119,7 @@ async function ensureFields(pb: PocketBase, collection: any): Promise<void> {
   });
 }
 
-function getRequiredFields(): Array<{ name: string; type: string; required: boolean }> {
+function getRequiredFields(): Array<{ name: string; type: string; [option: string]: unknown }> {
   return [
     { name: "source_id", type: "text", required: true },
     { name: "ts", type: "date", required: true },
@@ -131,19 +131,37 @@ function getRequiredFields(): Array<{ name: string; type: string; required: bool
     { name: "true_wind_speed_mps", type: "number", required: false },
     { name: "apparent_wind_dir_deg", type: "number", required: false },
     { name: "apparent_wind_speed_mps", type: "number", required: false },
+    // When the record reached PocketBase. The SAP uplink uses it as its cursor,
+    // so measurements that arrive late (with an old ts) are still forwarded.
+    { name: "created_at", type: "autodate", onCreate: true, onUpdate: false },
   ];
 }
 
+// Indexes on the measurements collection, by name
+const INDEXES: Record<string, (collectionName: string) => string> = {
+  // The SAP uplink polls each source for records stored after its cursor
+  idx_measurements_source_created_at: (c) =>
+    `CREATE INDEX \`idx_measurements_source_created_at\` ON \`${c}\` (\`source_id\`, \`created_at\`)`,
+};
+
 async function ensureIndexes(pb: PocketBase, collectionName: string): Promise<void> {
-  // PocketBase uses different API for indexes - this would depend on version
-  // For now, document that indexes should be:
-  // 1. Unique index on (source_id, ts)
-  // 2. Index on source_id for filtering
-  // 3. Index on ts for time-range queries
-  console.log("Note: Ensure the following indexes exist in PocketBase:");
-  console.log("  - Unique: (source_id, ts)");
-  console.log("  - Index: source_id");
-  console.log("  - Index: ts");
+  const collection = await pb.collections.getOne(collectionName);
+  const existing: string[] = collection.indexes || [];
+  const missing = Object.entries(INDEXES).filter(
+    ([name]) => !existing.some((sql) => sql.includes(`\`${name}\``))
+  );
+
+  if (missing.length === 0) {
+    return;
+  }
+
+  for (const [name] of missing) {
+    console.log(`Adding index: ${name}`);
+  }
+
+  await pb.collections.update(collection.id, {
+    indexes: [...existing, ...missing.map(([, sql]) => sql(collectionName))],
+  });
 }
 
 async function applySecurityRules(pb: PocketBase, collectionName: string): Promise<void> {
