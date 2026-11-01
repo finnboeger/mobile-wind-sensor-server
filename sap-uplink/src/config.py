@@ -71,13 +71,24 @@ class UplinkConfig:
         if not self.sources:
             raise ValueError("No valid SAP_SOURCES mappings found")
 
-        # Which races get the wind: SAP_RACES, a fixed list, or SAP_ALL_RACES=true for
-        # no list at all. SAP then adds the wind to every tracked race the login may
-        # update, including other people's races on a shared server.
+        # Which races get the wind, in order of precedence:
+        # 1. SAP_RACES: a fixed list
+        # 2. SAP_EVENT_ID (+ SAP_COURSE_AREA): the event's current races, looked up automatically
+        # 3. SAP_ALL_RACES=true: no list at all. SAP then adds the wind to every tracked
+        #    race the login may update, including other people's races on a shared server.
         self.races = parse_races(os.getenv("SAP_RACES"))
+        self.event_id = (os.getenv("SAP_EVENT_ID") or "").strip() or None
+        self.course_area = (os.getenv("SAP_COURSE_AREA") or "").strip() or None
         self.all_races = os.getenv("SAP_ALL_RACES", "false").strip().lower() in ("1", "true", "yes")
-        if not self.races and not self.all_races:
-            raise ValueError("Set SAP_RACES to the target races, or SAP_ALL_RACES=true to send to every tracked race")
+        if not self.races and not self.event_id and not self.all_races:
+            raise ValueError(
+                "Set SAP_EVENT_ID (and optionally SAP_COURSE_AREA) to follow the current race, "
+                "SAP_RACES to fix the target races, or SAP_ALL_RACES=true to send to every tracked race"
+            )
+        if self.course_area and not self.event_id:
+            raise ValueError("SAP_COURSE_AREA needs SAP_EVENT_ID")
+        self.race_refresh_seconds = float(os.getenv("SAP_RACE_REFRESH_SECONDS", "30"))
+        self.finished_grace_seconds = int(os.getenv("SAP_FINISHED_GRACE_SECONDS", "600"))
 
         self.wind_source_type = os.getenv("SAP_WIND_SOURCE_TYPE", "EXPEDITION").upper()
         if self.wind_source_type not in WIND_SOURCE_TYPES:
