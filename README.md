@@ -72,6 +72,8 @@ docker-compose down
 
 See [Docker Deployment Guide](#docker-deployment).
 
+Optional: set `COMPOSE_PROFILES=sap` to also run the SAP Sailing uplink, which forwards true wind to [SAP Sailing Analytics](https://www.sapsailing.com) races. See [sap-uplink/README.md](sap-uplink/README.md).
+
 ### Bare-Metal
 
 Dashboard Server (Node.js) on native OS.
@@ -135,6 +137,14 @@ wind-dashboard/
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── .dockerignore
+│
+├── sap-uplink/                          # Forwards wind to SAP Sailing putWind (Python, Docker)
+│   ├── src/
+│   │   ├── main.py
+│   │   ├── uplink.py
+│   │   └── convert.py
+│   ├── tests/
+│   └── Dockerfile
 │
 
 ├── frontend/                            # Vue 3 dashboard
