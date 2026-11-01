@@ -4,6 +4,7 @@ from unittest import mock
 import requests
 
 from src.pocketbase_reader import PocketbaseReader
+from src.sap_client import SapClient, SapError, SapRejectedError
 
 
 def response(status=200, json_body=None, text=""):
@@ -38,6 +39,52 @@ class PocketbaseReaderTest(unittest.TestCase):
         pages = list(reader.iter_range("sensor_1", "from", "to", page_size=2))
         self.assertEqual(pages, [[{"id": "a"}, {"id": "b"}], [{"id": "c"}]])
         self.assertIn('ts <= "to"', reader.session.get.call_args.kwargs["params"]["filter"])
+
+
+class SapClientTest(unittest.TestCase):
+    def test_put_wind_body_and_bearer_token(self):
+        client = SapClient("https://dev.sapsailing.com", "EXPEDITION", bearer_token="tok")
+        self.assertEqual(client.session.headers["Authorization"], "Bearer tok")
+        client.session = mock.Mock()
+        answers = [{"regattaNameAndRaceName": {"regattaName": "R", "raceName": "1"}, "answer": [True]}]
+        client.session.put.return_value = response(json_body=answers)
+        races = [{"regattaName": "R", "raceName": "1"}]
+
+        self.assertEqual(client.put_wind("windbot1", [{"timepoint": 1}], races), answers)
+
+        url = client.session.put.call_args.args[0]
+        body = client.session.put.call_args.kwargs["json"]
+        self.assertEqual(url, "https://dev.sapsailing.com/sailingserver/api/v1/wind/putWind")
+        self.assertEqual(
+            body,
+            {
+                "windData": [{"timepoint": 1}],
+                "windSourceType": "EXPEDITION",
+                "windSourceId": "windbot1",
+                "regattaNamesAndRaceNames": races,
+            },
+        )
+
+    def test_no_race_list_omits_field(self):
+        client = SapClient("https://dev.sapsailing.com", "WEB", user="u", password="p")
+        self.assertEqual(client.session.auth, ("u", "p"))
+        client.session = mock.Mock()
+        client.session.put.return_value = response(json_body=[])
+        client.put_wind("windbot1", [{"timepoint": 1}])
+        self.assertNotIn("regattaNamesAndRaceNames", client.session.put.call_args.kwargs["json"])
+
+    def test_errors(self):
+        client = SapClient("https://dev.sapsailing.com", "EXPEDITION", bearer_token="tok")
+        client.session = mock.Mock()
+        client.session.put.return_value = response(400, text="bad")
+        with self.assertRaises(SapRejectedError):
+            client.put_wind("windbot1", [])
+        client.session.put.return_value = response(503, text="maintenance")
+        with self.assertRaises(SapError):
+            client.put_wind("windbot1", [])
+        client.session.put.side_effect = requests.ConnectionError("offline")
+        with self.assertRaises(SapError):
+            client.put_wind("windbot1", [])
 
 
 if __name__ == "__main__":
