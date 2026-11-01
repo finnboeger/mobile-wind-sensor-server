@@ -83,15 +83,29 @@ LOG_LEVEL=info  # debug, info, warn, error
 ```
 
 `SAP_START_FROM` only applies when there is no saved cursor yet. To start over,
-delete the state file.
+remove the volume: `docker compose rm -sf sap-uplink && docker volume rm <project>_sap_uplink_data`.
 
 ## Running
 
-### Local development
+### Docker
+
+The service is behind the `sap` compose profile, so it only runs when enabled:
 
 ```bash
-./scripts/run-local.sh
+# in .env
+COMPOSE_PROFILES=sap
+SAP_URL=...
+SAP_USER=...
+SAP_PASSWORD=...
+SAP_SOURCES=sensor_1=windbot1
+SAP_RACES='[{"regattaName":"...","raceName":"..."}]'
+
+docker compose up -d
+docker compose logs -f sap-uplink
 ```
+
+To stop uploading after an event, remove `sap` from `COMPOSE_PROFILES` and run
+`docker compose stop sap-uplink`.
 
 ### Backfill
 
@@ -105,8 +119,11 @@ time range once and exits, without touching the cursor. Use it when:
   the `created_at` field existed).
 
 ```bash
-./scripts/run-local.sh --backfill 2027-06-20T09:00:00Z --until 2027-06-20T15:00:00Z
+docker compose run --rm sap-uplink python -m src.main \
+  --backfill 2027-06-20T09:00:00Z --until 2027-06-20T15:00:00Z
 ```
+
+Locally: `./scripts/run-local.sh --backfill … --until …`.
 
 - `--backfill FROM` and `--until TO` are ISO times of the measurement (`ts`),
   sending `FROM < ts <= TO`. `--until` defaults to now.
@@ -114,6 +131,12 @@ time range once and exits, without touching the cursor. Use it when:
   only keeps those inside a race's tracking interval.
 - It is safe to run again: SAP ignores fixes it already has for that wind
   source.
+
+### Local development
+
+```bash
+./scripts/run-local.sh
+```
 
 ### Tests
 
