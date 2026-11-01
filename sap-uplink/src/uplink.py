@@ -16,6 +16,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
+from src.config import UplinkConfig
 from src.convert import format_pocketbase_ts, to_wind_fix
 from src.pocketbase_reader import PocketbaseReader
 from src.sap_client import SapClient, SapRejectedError
@@ -57,7 +58,7 @@ class CursorStore:
 class Uplink:
     def __init__(
         self,
-        config: Any,  # UplinkConfig, added with the service entry point
+        config: UplinkConfig,
         reader: PocketbaseReader,
         sap: SapClient,
         store: CursorStore,
