@@ -123,6 +123,20 @@ class Uplink:
         self.store.save(self.cursor)
         return len(records) == self.config.max_batch_size
 
+    def backfill(self, start: datetime, end: datetime, races: Optional[List[Dict[str, str]]] = None) -> None:
+        """
+        Send a measurement time range once, independent of the cursor (e.g. after a
+        long data gap). With `races`, send to those instead of the current races.
+        """
+        if races is not None:
+            self.races_provider = lambda: races
+        after = format_pocketbase_ts(start)
+        until = format_pocketbase_ts(end)
+        logger.info(f"Backfilling {after} .. {until}")
+        for page in self.reader.iter_range(after, until, self.config.max_batch_size):
+            for source_id, records in self._by_source(page).items():
+                self._send(source_id, records)
+
     def _by_source(self, records: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """Group records by source, in arrival order, leaving out excluded sources."""
         grouped: Dict[str, List[Dict[str, Any]]] = {}

@@ -43,6 +43,11 @@ class FakeReader:
         )
         return matches[:limit]
 
+    def iter_range(self, after, until, page_size=200):
+        matches = sorted((r for r in self.records if after < r["ts"] <= until), key=lambda r: r["ts"])
+        for i in range(0, len(matches), page_size):
+            yield matches[i : i + page_size]
+
 
 class FakeSap:
     def __init__(self):
@@ -183,6 +188,14 @@ class UplinkTest(unittest.TestCase):
         self.assertEqual([w for w, _ in self.sap.calls], ["sensor_1", "sensor_1", "sensor_2"])
         self.assertEqual(uplink.cursor, ts(2))
         self.assertEqual(uplink.failures, 0)
+
+    def test_backfill_sends_range_without_moving_cursor(self):
+        self.reader.records = [measurement(s) for s in range(-10, 0)]
+        self.reader.records.append(measurement(-3, source_id="bench"))
+        uplink = self.make_uplink(exclude_sources={"bench"})
+        uplink.backfill(T0 - timedelta(seconds=5), T0)
+        self.assertEqual(self.sap.timepoints, [timepoint(s) for s in range(-4, 0)])
+        self.assertEqual(uplink.cursor, ts(0))
 
     def test_backoff_is_capped(self):
         uplink = self.make_uplink()
