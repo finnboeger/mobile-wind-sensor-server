@@ -90,15 +90,30 @@ class UplinkConfig:
         # (e.g. sensors on a test bench)
         self.exclude_sources = parse_list(os.getenv("SAP_EXCLUDE_SOURCES"))
 
-        # Which races get the wind: SAP_RACES, a fixed list, or SAP_ALL_RACES=true for
-        # no list at all. SAP then adds the wind to every tracked race the login may
-        # update, including other people's races on a shared server.
+        # Which races get the wind, in order of precedence:
+        # 1. SAP_RACES: a fixed list
+        # 2. SAP_EVENT_ID (+ SAP_COURSE_AREA): the event's current races, looked up automatically
+        # 3. SAP_ALL_RACES=true: no list at all. SAP then adds the wind to every tracked
+        #    race the login may update, including other people's races on a shared server.
         self.races = parse_races(os.getenv("SAP_RACES"))
+        self.event_id = (os.getenv("SAP_EVENT_ID") or "").strip() or None
+        self.course_area = (os.getenv("SAP_COURSE_AREA") or "").strip() or None
         self.all_races = flag("SAP_ALL_RACES", False)
-        if not self.races and not self.all_races:
-            raise ValueError("Set SAP_RACES to the target races, or SAP_ALL_RACES=true to send to every tracked race")
-        if self.races and self.all_races:
-            logger.warning("Both SAP_RACES and SAP_ALL_RACES are set: using SAP_RACES, ignoring SAP_ALL_RACES")
+        if not self.races and not self.event_id and not self.all_races:
+            raise ValueError(
+                "Set SAP_EVENT_ID (and optionally SAP_COURSE_AREA) to follow the current race, "
+                "SAP_RACES to fix the target races, or SAP_ALL_RACES=true to send to every tracked race"
+            )
+        set_options = [
+            name
+            for name, is_set in (("SAP_RACES", self.races), ("SAP_EVENT_ID", self.event_id), ("SAP_ALL_RACES", self.all_races))
+            if is_set
+        ]
+        if len(set_options) > 1:
+            logger.warning(f"{' and '.join(set_options)} are set: using {set_options[0]}, ignoring the rest")
+        if self.course_area and not self.event_id:
+            raise ValueError("SAP_COURSE_AREA needs SAP_EVENT_ID")
+        self.race_refresh_seconds = positive_number("SAP_RACE_REFRESH_SECONDS", "30")
 
         self.poll_seconds = positive_number("SAP_POLL_SECONDS", "5")
         self.max_batch_size = positive_number("SAP_MAX_BATCH_SIZE", "200", int)

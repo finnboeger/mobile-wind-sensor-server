@@ -85,6 +85,22 @@ class SapClientTest(unittest.TestCase):
         with self.assertRaises(SapError):
             client.put_wind("windbot1", [])
 
+    def test_race_states(self):
+        client = SapClient("https://dev.sapsailing.com", bearer_token="tok")
+        client.session = mock.Mock()
+        client.session.get.return_value = response(json_body={"raceStates": [{"raceName": "R1"}]})
+        self.assertEqual(client.get_race_states("e1", "Alpha"), [{"raceName": "R1"}])
+        self.assertEqual(client.session.get.call_args.kwargs["params"], {"filterByCourseArea": "Alpha"})
+
+        client.session.get.return_value = response(404, text="Could not find an event")
+        with self.assertRaisesRegex(SapRejectedError, "SAP_EVENT_ID"):
+            client.get_race_states("e1")
+        bad = response(text="<html>")
+        bad.json.side_effect = ValueError("not json")
+        client.session.get.return_value = bad
+        with self.assertRaisesRegex(SapError, "unexpected response"):
+            client.get_race_states("e1")
+
 
 if __name__ == "__main__":
     unittest.main()

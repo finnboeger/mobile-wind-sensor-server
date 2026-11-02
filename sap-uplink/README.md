@@ -59,14 +59,19 @@ SAP_URL=https://my-event.sapsailing.com
 # (see "Getting an access token" below)
 SAP_BEARER_TOKEN=
 
-# Races to put the wind into (JSON). Use the tracked race name from the
-# AdminConsole's "Tracked races" table: smartphone-tracked races are named
-# "<regatta> <race> <fleet>", e.g. "Windbot Test R1 Default".
+# Which races get the wind. Set ONE of these (see "Choosing races" below):
+
+# a) Follow the current race of an event automatically (recommended).
+#    The event id is in the event page URL (…#/regatta/races/:eventId=<id>).
+SAP_EVENT_ID=<event-uuid>
+SAP_COURSE_AREA=Default           # optional: only races on this course area
+
+# b) A fixed list of races (JSON), named as in the AdminConsole's "Tracked races"
+#    table: smartphone-tracked races are named "<regatta> <race> <fleet>".
 SAP_RACES='[{"regattaName":"Windbot Test","raceName":"Windbot Test R1 Default"}]'
 
-# Or, instead of SAP_RACES: send to every tracked race the login may update.
-# Careful with logins that have admin rights on a shared server: SAP then also
-# adds the wind to other people's races.
+# c) Every tracked race the login may update. Careful with logins that have admin
+#    rights on a shared server: SAP then also adds the wind to other people's races.
 SAP_ALL_RACES=false
 
 # Optional
@@ -75,11 +80,33 @@ SAP_START_FROM=                   # on first run, send what reached PocketBase a
 SAP_POLL_SECONDS=5
 SAP_MAX_BATCH_SIZE=200            # records read per round, so also max fixes per request
 SAP_REQUEST_TIMEOUT_SECONDS=30
+SAP_RACE_REFRESH_SECONDS=30       # how often the current races are looked up (a)
 SAP_STATE_FILE=/data/cursor.json
 
 POCKETBASE_URL=http://pocketbase:8090
 LOG_LEVEL=info  # debug, info, warning, error
 ```
+
+### Choosing races
+
+With `SAP_EVENT_ID` the service asks SAP for the event's race states
+(`/api/v1/events/{id}/racestates`, filtered by `SAP_COURSE_AREA`) every
+`SAP_RACE_REFRESH_SECONDS` and sends to every race that
+
+- is tracked (tracking was started, so it shows up under "Tracked races"), and
+- hasn't finished, or was first seen finished less than 10 minutes ago, so
+  measurements that arrive late still get in (SAP keeps fixes up to 3 minutes
+  after the end).
+
+So the race officer's usual flow (start tracking, set the start, finish) is all
+it takes; nothing needs changing on our side between races. SAP itself only
+stores fixes inside each race's tracking interval. If several races qualify on
+the course area, e.g. because one wasn't finished, all of them get the wind:
+they are sailed in the same wind. With no qualifying race, fixes are dropped.
+If a lookup fails, the last known races are used. At startup the event is
+looked up once: an unknown `SAP_EVENT_ID` stops the service, and a
+`SAP_COURSE_AREA` without races is logged with the course areas that have
+races.
 
 `SAP_START_FROM` only applies when there is no saved cursor yet. To start over,
 remove the volume: `docker compose rm -sf sap-uplink && docker volume rm <project>_sap_uplink_data`.
@@ -104,7 +131,8 @@ The service is behind the `sap` compose profile, so it only runs when enabled:
 COMPOSE_PROFILES=sap
 SAP_URL=...
 SAP_BEARER_TOKEN=...
-SAP_RACES='[{"regattaName":"...","raceName":"..."}]'
+SAP_EVENT_ID=...
+SAP_COURSE_AREA=...
 
 docker compose up -d
 docker compose logs -f sap-uplink
@@ -133,8 +161,9 @@ Locally: `./scripts/run-local.sh --backfill … --until …`.
 
 - `--backfill FROM` and `--until TO` are ISO times of the measurement (`ts`),
   sending `FROM < ts <= TO`. `--until` defaults to now.
-- The fixes go to the configured races (`SAP_RACES` or `SAP_ALL_RACES`). SAP
-  only keeps those inside a race's tracking interval.
+- The fixes go to the configured races. With `SAP_EVENT_ID` that is every
+  tracked race on the course area, finished ones included. SAP only keeps
+  fixes inside a race's tracking interval.
 - It is safe to run again: SAP ignores fixes it already has for that wind
   source.
 

@@ -11,6 +11,8 @@ PUT_WIND_PATH = "/sailingserver/api/v1/wind/putWind"
 # meant for manually entered wind and shown as "Manual".
 WIND_SOURCE_TYPE = "EXPEDITION"
 
+RACE_STATES_PATH = "/sailingserver/api/v1/events/{event_id}/racestates"
+
 
 class SapError(Exception):
     """A request that may succeed when retried (network, auth, server errors)."""
@@ -68,3 +70,25 @@ class SapClient:
             return []
         return answers if isinstance(answers, list) else []
 
+    def get_race_states(self, event_id: str, course_area: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Race states of all races in an event, optionally only those on one course area."""
+        params = {"filterByCourseArea": course_area} if course_area else {}
+        try:
+            response = self.session.get(
+                self.sap_url + RACE_STATES_PATH.format(event_id=event_id),
+                params=params,
+                timeout=self.timeout_seconds,
+            )
+        except requests.RequestException as e:
+            raise SapError(f"racestates request failed: {e}") from e
+        if response.status_code == 404:
+            raise SapRejectedError(f"event {event_id} not found (check SAP_EVENT_ID)")
+        if not response.ok:
+            raise SapError(f"racestates returned {response.status_code}: {response.text[:500]}")
+        try:
+            race_states = response.json()["raceStates"]
+        except (ValueError, KeyError, TypeError) as e:
+            raise SapError(f"racestates returned an unexpected response: {response.text[:500]}") from e
+        if not isinstance(race_states, list):
+            raise SapError(f"racestates returned an unexpected response: {response.text[:500]}")
+        return race_states
