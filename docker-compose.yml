@@ -95,6 +95,8 @@ services:
         condition: service_healthy
       dashboard-server:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
     networks:
       - wind-network
     restart: unless-stopped

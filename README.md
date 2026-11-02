@@ -358,8 +358,8 @@ port 1883, which is only reachable inside the docker network.
    ```
    If something already serves port 80 (a reverse proxy), use
    `--webroot` or a DNS challenge instead of `--standalone`.
-3. Create one user for the ingestion service and one per boat, and give each
-   boat its topic in `mosquitto/config/acl`:
+3. Create one user for the ingestion service and one per boat. A boat may
+   only publish to the topic named like its user:
    ```bash
    ./mosquitto/add-user.sh ingestion
    ./mosquitto/add-user.sh bot1

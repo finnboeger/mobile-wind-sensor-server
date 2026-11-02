@@ -1,7 +1,7 @@
 #!/bin/sh
 # Add or update a Mosquitto user (prompts for the password).
 #   ./mosquitto/add-user.sh bot1
-# Remember to give the user a topic in mosquitto/config/acl.
+# A boat user may publish to the topic named like the user (see config/acl).
 set -eu
 
 if [ $# -ne 1 ]; then
