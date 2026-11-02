@@ -9,7 +9,7 @@ so the boats only upload their data once (to our MQTT broker).
 
 ```
 measurements collection (PocketBase, public read)
-    ↓  poll every SAP_POLL_SECONDS, in arrival order
+    ↓  on every new record (realtime) or every SAP_POLL_SECONDS, in arrival order
 convert (needs position + true wind)
     ↓
 PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
@@ -33,6 +33,13 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
   fixes (e.g. outside every race's tracking interval). While SAP or the network
   is down it stays put, so nothing is lost, and a restart resumes where it
   stopped.
+- New measurements are forwarded within about a second: the service
+  subscribes to PocketBase realtime (`/api/realtime`, topic `measurements/*`)
+  and a new record of a source that isn't excluded triggers an immediate read
+  through the cursor. The subscription is only a wake-up signal, so a dropped
+  connection loses nothing: it reconnects with backoff, resubscribes and
+  catches up from the cursor. Polling every `SAP_POLL_SECONDS` stays as a
+  fallback. Set `SAP_REALTIME=false` to only poll.
 - Measurements without a GPS position or true wind are skipped, because
   putWind requires both.
 - If SAP answers `400`, that batch is logged and skipped so it can't block the
@@ -77,7 +84,8 @@ SAP_ALL_RACES=false
 # Optional
 SAP_EXCLUDE_SOURCES=              # source_ids not to upload, comma-separated (e.g. sensors on a test bench)
 SAP_START_FROM=                   # on first run, send what reached PocketBase after this ISO time (default: now)
-SAP_POLL_SECONDS=5
+SAP_REALTIME=true                 # forward new measurements as soon as PocketBase announces them
+SAP_POLL_SECONDS=                 # fallback poll interval (default: 30 with realtime, 5 without)
 SAP_MAX_BATCH_SIZE=200            # records read per round, so also max fixes per request
 SAP_REQUEST_TIMEOUT_SECONDS=30
 SAP_RACE_REFRESH_SECONDS=30       # how often the current races are looked up (a)

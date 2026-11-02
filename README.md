@@ -146,6 +146,7 @@ wind-dashboard/
 │   │   ├── pocketbase_reader.py         # Reads measurements
 │   │   ├── sap_client.py                # putWind client
 │   │   ├── race_finder.py               # Current races of an event
+│   │   ├── realtime.py                  # PocketBase realtime wake-ups
 │   │   └── convert.py                   # Measurement → wind fix
 │   ├── tests/
 │   ├── scripts/run-local.sh
