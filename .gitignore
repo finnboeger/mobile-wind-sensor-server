@@ -58,4 +58,3 @@ dmypy.json
 *.tar.gz
 # Mosquitto secrets
 mosquitto/config/passwd
-mosquitto/certs/*.pem

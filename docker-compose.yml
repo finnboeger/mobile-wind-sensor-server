@@ -101,17 +101,14 @@ services:
       - wind-network
     restart: unless-stopped
 
-  # Mosquitto MQTT broker: boats connect over TLS on 8883, mqtt-ingestion
-  # uses the plain 1883 listener inside the docker network.
+  # Mosquitto MQTT broker on plain 1883 inside the docker network. The boats
+  # reach it through a TLS-terminating reverse proxy (docker-compose.traefik.yml).
   # Setup: see "Self-hosted MQTT broker" in README.md
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: wind-mosquitto
-    ports:
-      - "${MOSQUITTO_TLS_PORT:-8883}:8883"
     volumes:
       - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/certs:/mosquitto/certs:ro
     environment:
       - TZ=${TZ:-UTC}
     networks:

@@ -343,28 +343,27 @@ docker-compose down -v
 
 ### Self-hosted MQTT broker
 
-The stack includes a Mosquitto broker (`mosquitto` service). The boats connect
-to it over TLS on port 8883; `mqtt-ingestion` connects to the plain listener on
-port 1883, which is only reachable inside the docker network.
+The stack includes a Mosquitto broker (`mosquitto` service) with a plain
+listener on port 1883 that is only reachable inside the docker network.
+`mqtt-ingestion` connects to it directly. The boats connect over TLS through a
+reverse proxy that terminates TLS and forwards to `mosquitto:1883`.
+`docker-compose.traefik.yml` does this with Traefik.
 
-1. Point a DNS name (e.g. `mqtt.example.com`) at the server and open TCP 8883
-   (and TCP 80 for the certificate challenge).
-2. Get a Let's Encrypt certificate and copy it to `mosquitto/certs/` on every
-   renewal:
-   ```bash
-   sudo certbot certonly --standalone -d mqtt.example.com \
-     --deploy-hook "$PWD/mosquitto/certs/renew-hook.sh"
-   sudo RENEWED_LINEAGE=/etc/letsencrypt/live/mqtt.example.com ./mosquitto/certs/renew-hook.sh
+1. Point a DNS name (e.g. `mqtt.example.com`) at the server.
+2. Give Traefik a TCP entrypoint for MQTT over TLS and open that port, e.g. in
+   Traefik's static config:
    ```
-   If something already serves port 80 (a reverse proxy), use
-   `--webroot` or a DNS challenge instead of `--standalone`.
+   --entrypoints.mqtts.address=:8883
+   ```
+   Traefik gets the certificate from its certificate resolver like for any
+   other router (it routes by SNI, which the boats send).
 3. Create one user for the ingestion service and one per boat. A boat may
    only publish to the topic named like its user:
    ```bash
    ./mosquitto/add-user.sh ingestion
    ./mosquitto/add-user.sh bot1
    ```
-4. Configure the ingestion service in `.env`:
+4. Configure `.env`:
    ```bash
    MQTT_HOST=mosquitto
    MQTT_PORT=1883
@@ -372,12 +371,22 @@ port 1883, which is only reachable inside the docker network.
    MQTT_USER=ingestion
    MQTT_PASSWORD=...
    MQTT_TOPICS=bot1=bot1
+
+   MQTT_DOMAIN=mqtt.example.com
+   TRAEFIK_NETWORK=traefik          # docker network Traefik is on
+   TRAEFIK_MQTT_ENTRYPOINT=mqtts
+   TRAEFIK_CERTRESOLVER=letsencrypt
    ```
-5. `docker compose up -d`, then on each boat set in `config.ini`:
+5. Start the stack with the Traefik labels:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+   ```
+6. On each boat set in `config.ini`:
    ```ini
    [MQTT]
    BROKER = mqtt.example.com
    PORT = 8883
+   USE_TLS = true
    USERNAME = bot1
    PASSWORD = ...
    TOPIC = bot1
