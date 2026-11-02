@@ -1,0 +1,26 @@
+export interface Race {
+  regattaName: string;
+  raceName: string;
+  finished?: boolean;
+}
+
+// The uplink's status record (sap-uplink/src/status.py)
+export interface UplinkStatus {
+  started_at?: string;
+  heartbeat_at?: string;
+  configured?: boolean;
+  problem?: string;
+  sap_url?: string;
+  event_id?: string;
+  course_area?: string;
+  realtime?: string;
+  cursor?: string;
+  last_sent_at?: string;
+  last_accepted_at?: string;
+  last_error_at?: string;
+  last_error?: string;
+  current_races?: Race[];
+  all_races?: boolean;
+  tracked_races?: Race[];
+  stats?: Record<string, number>;
+}
