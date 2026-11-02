@@ -1,5 +1,6 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import type PocketBase from "pocketbase";
+import BackfillList from "./components/BackfillList.vue";
 import RacesTable from "./components/RacesTable.vue";
 import SapCard from "./components/SapCard.vue";
 import SourcesCard from "./components/SourcesCard.vue";
@@ -8,15 +9,16 @@ import { ageClass, ms, now } from "./format";
 import { STATUS_ID, connect, isNotFound, message } from "./pocketbase";
 import { buildRaces, raceKey } from "./races";
 import { findSources, loadSources, type SourceHealth } from "./sources";
-import type { RaceUpload, UplinkStatus } from "./types";
+import type { Backfill, RaceUpload, UplinkStatus } from "./types";
 
 export default defineComponent({
-  components: { RacesTable, SapCard, SourcesCard, UplinkCard },
+  components: { BackfillList, RacesTable, SapCard, SourcesCard, UplinkCard },
   setup() {
     const pb = shallowRef<PocketBase | null>(null);
     const loadError = ref("");
     const status = ref<UplinkStatus | null>(null);
     const uploads = ref<RaceUpload[]>([]);
+    const backfills = ref<Backfill[]>([]);
     const sources = ref<SourceHealth[]>([]);
 
     const uplinkAlive = computed(() => ageClass(ms(status.value?.heartbeat_at), 60, 120) !== "bad");
@@ -54,6 +56,11 @@ export default defineComponent({
       uploads.value = await pb.value!.collection("sap_race_uploads").getFullList<RaceUpload>({ requestKey: null });
     }
 
+    async function loadBackfills() {
+      const page = await pb.value!.collection("sap_backfills").getList<Backfill>(1, 10, { sort: "-created", requestKey: null });
+      backfills.value = page.items;
+    }
+
     async function loadMeasurements() {
       if (Date.now() - sourcesFoundAt > 300_000) {
         sourceIds = await findSources(pb.value!);
@@ -64,7 +71,7 @@ export default defineComponent({
 
     async function loadAll() {
       try {
-        await Promise.all([loadStatus(), loadUploads(), loadMeasurements()]);
+        await Promise.all([loadStatus(), loadUploads(), loadBackfills(), loadMeasurements()]);
         loadError.value = "";
       } catch (e) {
         loadError.value = `Could not load from PocketBase: ${message(e)}`;
@@ -87,6 +94,7 @@ export default defineComponent({
         pb.value!.collection(collection).subscribe("*", () => load().catch(() => {})).catch(() => {});
       subscribe("sap_uplink_status", loadStatus);
       subscribe("sap_race_uploads", loadUploadsSoon);
+      subscribe("sap_backfills", loadBackfills);
       timers.push(window.setInterval(() => loadMeasurements().catch(() => {}), 5000));
       timers.push(window.setInterval(loadAll, 30000));
     });
@@ -96,6 +104,6 @@ export default defineComponent({
       pb.value?.realtime.unsubscribe();
     });
 
-    return { loadError, status, sources, uplinkAlive, currentKeys, races };
+    return { loadError, status, backfills, sources, uplinkAlive, currentKeys, races };
   },
 });
