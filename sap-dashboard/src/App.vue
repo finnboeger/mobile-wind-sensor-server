@@ -2,6 +2,7 @@
   <div class="page">
     <header>
       <h1>SAP forwarding</h1>
+      <button v-if="pb" class="icon-btn" @click="dialog = 'settings'" aria-label="SAP settings">⚙</button>
     </header>
 
     <div v-if="loadError" class="banner error">{{ loadError }}</div>
@@ -14,6 +15,10 @@
 
     <RacesTable :races="races" />
     <BackfillList :backfills="backfills" />
+
+    <AdminDialog v-if="pb && dialog === 'settings'" :pb="pb" title="SAP settings" @close="dialog = null">
+      <p class="muted">Logged in.</p>
+    </AdminDialog>
   </div>
 </template>
 
@@ -35,6 +40,14 @@ header {
 }
 
 h1 { font-size: 1.4rem; }
+
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  cursor: pointer;
+  line-height: 1;
+}
 
 .cards {
   display: grid;

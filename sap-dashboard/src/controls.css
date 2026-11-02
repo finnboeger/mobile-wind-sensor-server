@@ -1,0 +1,41 @@
+.btn {
+  background: #eceef3;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn.small { padding: 4px 10px; font-size: 0.8rem; }
+.btn.primary { background: #667eea; color: #fff; font-weight: 600; }
+.btn.link { background: none; color: #667eea; padding: 0; }
+.btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Forms inside AdminDialog */
+.dialog-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: #444;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.dialog-form input,
+.dialog-form select {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.95rem;
+  width: 100%;
+}
+
+.dialog-form p { margin-bottom: 12px; }
+
+.panel-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
