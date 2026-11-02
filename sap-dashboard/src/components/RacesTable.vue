@@ -2,6 +2,7 @@
   <section class="card">
     <div class="head">
       <h2>Races</h2>
+      <button v-if="backfill" class="btn" @click="emit('backfill', null)">Backfill…</button>
     </div>
     <p v-if="races.length === 0" class="muted">No race has received wind yet.</p>
     <div v-else class="table-wrap">
@@ -13,6 +14,7 @@
             <th>First accepted fix</th>
             <th>Last accepted fix</th>
             <th>Sources</th>
+            <th v-if="backfill"></th>
           </tr>
         </thead>
         <tbody>
@@ -30,6 +32,7 @@
             <td class="small">
               <div v-for="s in r.sources" :key="s">{{ s }}</div>
             </td>
+            <td v-if="backfill"><button class="btn small" @click="emit('backfill', r)">Backfill</button></td>
           </tr>
         </tbody>
       </table>

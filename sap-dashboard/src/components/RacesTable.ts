@@ -5,8 +5,13 @@ import type { RaceRow } from "../races";
 export default defineComponent({
   props: {
     races: { type: Array as PropType<RaceRow[]>, required: true },
+    // Show the backfill buttons
+    backfill: { type: Boolean, default: false },
   },
-  setup() {
-    return { ago, dateTime };
+  emits: {
+    backfill: (_race: RaceRow | null) => true,
+  },
+  setup(_props, { emit }) {
+    return { emit, ago, dateTime };
   },
 });

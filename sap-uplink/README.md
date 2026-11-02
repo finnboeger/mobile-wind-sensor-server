@@ -183,7 +183,8 @@ To stop uploading after an event, remove `sap` from `COMPOSE_PROFILES` and run
 
 ### Backfill
 
-A backfill can also be requested by adding a record to `sap_backfills`
+A backfill can also be requested on the sap-dashboard page, which adds a
+record to `sap_backfills`
 (`regatta_name` and `race_name`, or both empty for every tracked race of the
 event; `range_from`, `range_until`; `status` = `pending`). The uplink runs
 pending ones one at a time on a thread of its own, next to live forwarding,
