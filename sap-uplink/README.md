@@ -47,6 +47,52 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
 | `direction` | `(true_wind_dir_deg + 180) % 360`: SAP stores the direction the wind blows **to** |
 | `speedinknots` | `true_wind_speed_mps × 1.94384` |
 
+## Configuration
+
+All configuration via environment variables:
+
+```bash
+# SAP Sailing server: the event's server, without the /sailingserver path
+SAP_URL=https://my-event.sapsailing.com
+
+# Access token of a user with TRACKED_RACE:UPDATE permission on the races
+# (see "Getting an access token" below)
+SAP_BEARER_TOKEN=
+
+# Races to put the wind into (JSON). Use the tracked race name from the
+# AdminConsole's "Tracked races" table: smartphone-tracked races are named
+# "<regatta> <race> <fleet>", e.g. "Windbot Test R1 Default".
+SAP_RACES='[{"regattaName":"Windbot Test","raceName":"Windbot Test R1 Default"}]'
+
+# Or, instead of SAP_RACES: send to every tracked race the login may update.
+# Careful with logins that have admin rights on a shared server: SAP then also
+# adds the wind to other people's races.
+SAP_ALL_RACES=false
+
+# Optional
+SAP_EXCLUDE_SOURCES=              # source_ids not to upload, comma-separated (e.g. sensors on a test bench)
+SAP_START_FROM=                   # on first run, send what reached PocketBase after this ISO time (default: now)
+SAP_POLL_SECONDS=5
+SAP_MAX_BATCH_SIZE=200            # records read per round, so also max fixes per request
+SAP_REQUEST_TIMEOUT_SECONDS=30
+SAP_STATE_FILE=/data/cursor.json
+
+POCKETBASE_URL=http://pocketbase:8090
+LOG_LEVEL=info  # debug, info, warn, error
+```
+
+`SAP_START_FROM` only applies when there is no saved cursor yet. To start over,
+delete the state file.
+
+### Getting an access token
+
+The service only authenticates with an access token. Create one for the user
+as described in SAP Sailing's
+[access token documentation](https://www.sapsailing.com/security/webservices/api/access_token.html).
+The user needs TRACKED_RACE:UPDATE permission on the target races. A wrong or
+expired token is not rejected: SAP then treats requests as anonymous and adds
+the wind to no race.
+
 ## Development
 
 ### Tests
