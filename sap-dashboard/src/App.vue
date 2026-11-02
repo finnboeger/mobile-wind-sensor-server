@@ -11,6 +11,8 @@
       <UplinkCard :status="status" :alive="uplinkAlive" />
       <SapCard :status="status" :has-current-race="currentKeys.size > 0" />
     </section>
+
+    <RacesTable :races="races" />
   </div>
 </template>
 

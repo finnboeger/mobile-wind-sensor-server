@@ -80,6 +80,20 @@ td {
   vertical-align: top;
 }
 
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #eceef3;
+  color: #555;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.badge.ok { background: #dcf3e4; color: #1f7a45; }
+.badge.warn { background: #fdf0cc; color: #8a6200; }
+.badge.bad { background: #fbdede; color: #a12f2f; }
+.badge.info { background: #e3e8fb; color: #3d4fb0; }
 
 .banner {
   padding: 10px 14px;

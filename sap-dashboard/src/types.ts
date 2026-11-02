@@ -25,6 +25,16 @@ export interface UplinkStatus {
   stats?: Record<string, number>;
 }
 
+export interface RaceUpload {
+  regatta_name: string;
+  race_name: string;
+  source_id: string;
+  first_fix: string;
+  last_fix: string;
+  fixes_accepted: number;
+  last_accepted_at: string;
+}
+
 export interface Measurement {
   source_id: string;
   ts: string;
