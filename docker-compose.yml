@@ -109,6 +109,7 @@ services:
     container_name: wind-mosquitto
     volumes:
       - ./mosquitto/config:/mosquitto/config
+      - mosquitto_data:/mosquitto/data
     environment:
       - TZ=${TZ:-UTC}
     networks:
@@ -165,4 +166,5 @@ networks:
 volumes:
   pocketbase_data:
   pocketbase_migrations:
+  mosquitto_data:
   sap_uplink_data:
