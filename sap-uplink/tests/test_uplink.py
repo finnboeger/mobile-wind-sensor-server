@@ -234,6 +234,7 @@ class UplinkTest(unittest.TestCase):
 
         self.assertFalse(uplink.poll_once())
         self.assertEqual((self.sap.calls, uplink.cursor), ([], ts(0)))
+        self.assertEqual(uplink.status.fields["problem"], "No SAP server set")
 
         settings.value = SapSettings(sap_url="https://a.sapsailing.com", access_token="t1")
         uplink.retry_at = 0
@@ -244,6 +245,7 @@ class UplinkTest(unittest.TestCase):
 
         self.assertEqual(clients, [("https://a.sapsailing.com", "t1"), ("https://b.sapsailing.com", "t2")])
         self.assertEqual(self.sap.timepoints, [timepoint(1), timepoint(2)])
+        self.assertTrue(uplink.status.fields["configured"])
 
 
 if __name__ == "__main__":

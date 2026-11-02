@@ -10,8 +10,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-# Fixed id of the single settings record (PocketBase ids are 15 chars of a-z0-9)
+# Fixed ids for the single-record collections (PocketBase ids are 15 chars of a-z0-9)
 SETTINGS_ID = "sapuplinkconfig"
+STATUS_ID = "sapuplinkstatus"
 
 class PocketbaseStore:
     """Superuser access to PocketBase records; logs in again when the token is refused."""

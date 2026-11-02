@@ -23,6 +23,7 @@ from src.config import UplinkConfig
 from src.convert import format_pocketbase_ts, to_wind_fix
 from src.pocketbase_reader import PocketbaseReader
 from src.sap_client import SapClient, SapRejectedError
+from src.status import UplinkStatus
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ class Uplink:
         store: Optional[CursorStore],
         races_provider: RacesProvider = lambda: None,
         target=None,
+        status: Optional[UplinkStatus] = None,
     ):
         """
         With a target (src.target.SapTarget), the SAP client and races come
@@ -83,6 +85,7 @@ class Uplink:
         self.store = store
         self.races_provider = races_provider
         self.target = target
+        self.status = status or UplinkStatus(None)
         self.cursor = ""
         # Failed rounds in a row, and when to try again (monotonic)
         self.failures = 0
@@ -98,6 +101,7 @@ class Uplink:
             self.cursor = format_pocketbase_ts(self.config.start_from or datetime.now(timezone.utc))
             logger.info(f"No saved cursor, starting after {self.cursor}")
             self.store.save(self.cursor)
+        self.status.update(cursor=self.cursor)
 
     def run_forever(self, wakeups: Optional["queue.Queue[None]"] = None) -> None:
         """
@@ -106,7 +110,9 @@ class Uplink:
         soon as something arrives on it.
         """
         while True:
-            if self.poll_once():
+            backlog = self.poll_once()
+            self.status.tick()
+            if backlog:
                 continue
             # While backing off, wake up when the retry is due
             timeout = self.config.poll_seconds
@@ -140,16 +146,27 @@ class Uplink:
             delay = self.backoff_seconds(self.failures)
             self.retry_at = time.monotonic() + delay
             logger.warning(f"Upload failed ({self.failures} in a row), retrying in {delay:.0f}s: {e}")
+            self.status.failed(str(e))
             return False
         self.failures = 0
         return backlog
 
     def _retarget(self) -> bool:
         """Follow the target's current settings; False while they don't allow sending."""
-        if self.target.refresh():
+        problem = self.target.refresh()
+        settings = self.target.settings
+        self.status.update(
+            configured=problem is None,
+            problem=problem or "",
+            sap_url=settings.sap_url if settings else "",
+            event_id=settings.event_id if settings else "",
+            course_area=settings.course_area if settings else "",
+        )
+        if problem:
             return False
         self.sap = self.target.sap
         self.races_provider = self.target.current_races
+        self.target.refresh_races()
         return True
 
     def backoff_seconds(self, failures: int) -> float:
@@ -168,6 +185,7 @@ class Uplink:
             self._send(source_id, source_records)
         self.cursor = records[-1]["created_at"]
         self.store.save(self.cursor)
+        self.status.update(cursor=self.cursor)
         return len(records) == self.config.max_batch_size
 
     def backfill(self, start: datetime, end: datetime, races: Optional[List[Dict[str, str]]] = None) -> None:
@@ -215,8 +233,10 @@ class Uplink:
                 answers = None
 
             if answers is not None:
+                accepted = self._log_answers(source_id, len(fixes), answers)
                 self.stats["fixes_sent"] += len(fixes)
-                self.stats["fixes_accepted"] += self._log_answers(source_id, len(fixes), answers)
+                self.stats["fixes_accepted"] += accepted
+                self.status.sent(accepted > 0)
         else:
             logger.debug(f"{source_id}: {len(records)} record(s) without position or true wind, nothing to send")
 
