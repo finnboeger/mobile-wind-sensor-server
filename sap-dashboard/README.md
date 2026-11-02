@@ -4,6 +4,15 @@ A static Vue page that shows whether wind data gets from PocketBase to SAP
 Sailing. It reads PocketBase directly from the browser: `measurements` and the
 SAP uplink's own collections (see `sap-uplink/README.md`).
 
+## What it shows
+
+- **Uplink service**: heartbeat, settings problem, SAP server, race selection,
+  realtime connection, and how far it has forwarded.
+- **SAP**: when it last accepted fixes and last answered, the last error, and a
+  warning when SAP answers but no current race takes the fixes (usually a
+  wrong or expired access token: SAP doesn't refuse it, it just adds the wind
+  to no race).
+
 ## Running
 
 With Docker it runs behind the `sap` compose profile, next to the uplink, on

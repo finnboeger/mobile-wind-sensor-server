@@ -1,13 +1,25 @@
-import { defineComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { computed, defineComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import type PocketBase from "pocketbase";
+import SapCard from "./components/SapCard.vue";
+import UplinkCard from "./components/UplinkCard.vue";
+import { ageClass, ms } from "./format";
 import { STATUS_ID, connect, isNotFound, message } from "./pocketbase";
 import type { UplinkStatus } from "./types";
 
 export default defineComponent({
+  components: { SapCard, UplinkCard },
   setup() {
     const pb = shallowRef<PocketBase | null>(null);
     const loadError = ref("");
     const status = ref<UplinkStatus | null>(null);
+
+    const uplinkAlive = computed(() => ageClass(ms(status.value?.heartbeat_at), 60, 120) !== "bad");
+
+    // A dead uplink's current races are stale
+    const currentKeys = computed(() => {
+      if (!uplinkAlive.value) return new Set<string>();
+      return new Set((status.value?.current_races || []).map((r) => `${r.regattaName}\u0000${r.raceName}`));
+    });
 
     async function loadStatus() {
       try {
@@ -50,6 +62,6 @@ export default defineComponent({
       pb.value?.realtime.unsubscribe();
     });
 
-    return { loadError, status };
+    return { loadError, status, uplinkAlive, currentKeys };
   },
 });
