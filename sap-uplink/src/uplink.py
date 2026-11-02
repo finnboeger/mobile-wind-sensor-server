@@ -33,6 +33,8 @@ RETRY_BASE_SECONDS = 5
 # Returns the races to send to: a list ({regattaName, raceName}), or None for
 # "no list" (SAP picks every tracked race the login may update)
 RacesProvider = Callable[[], Optional[List[Dict[str, str]]]]
+# How often to look for new settings while there are none to send with
+UNCONFIGURED_RECHECK_SECONDS = 5
 
 
 class CursorStore:
@@ -66,14 +68,21 @@ class Uplink:
         config: UplinkConfig,
         reader: PocketbaseReader,
         sap: SapClient,
-        store: CursorStore,
+        store: Optional[CursorStore],
         races_provider: RacesProvider = lambda: None,
+        target=None,
     ):
+        """
+        With a target (src.target.SapTarget), the SAP client and races come
+        from it and follow the settings in PocketBase; sap and races_provider are
+        then ignored.
+        """
         self.config = config
         self.reader = reader
         self.sap = sap
         self.store = store
         self.races_provider = races_provider
+        self.target = target
         self.cursor = ""
         # Failed rounds in a row, and when to try again (monotonic)
         self.failures = 0
@@ -121,6 +130,9 @@ class Uplink:
         """Send the next batch unless backing off; True if more may be waiting."""
         if time.monotonic() < self.retry_at:
             return False
+        if self.target is not None and not self._retarget():
+            self.retry_at = time.monotonic() + UNCONFIGURED_RECHECK_SECONDS
+            return False
         try:
             backlog = self.forward_new()
         except Exception as e:
@@ -131,6 +143,14 @@ class Uplink:
             return False
         self.failures = 0
         return backlog
+
+    def _retarget(self) -> bool:
+        """Follow the target's current settings; False while they don't allow sending."""
+        if self.target.refresh():
+            return False
+        self.sap = self.target.sap
+        self.races_provider = self.target.current_races
+        return True
 
     def backoff_seconds(self, failures: int) -> float:
         base = min(self.config.poll_seconds, RETRY_BASE_SECONDS)

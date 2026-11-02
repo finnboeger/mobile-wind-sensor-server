@@ -26,10 +26,9 @@ from src.collections import ensure_collections
 from src.config import UplinkConfig, parse_timestamp
 from src.pocketbase_reader import PocketbaseReader
 from src.pocketbase_store import PocketbaseStore
-from src.race_finder import RaceFinder
 from src.realtime import RealtimeListener
 from src.settings import SettingsSource
-from src.sap_client import SapClient, SapError, SapRejectedError
+from src.target import SapTarget
 from src.uplink import CursorStore, Uplink
 
 logging.basicConfig(
@@ -102,40 +101,7 @@ def main():
             config.request_timeout_seconds,
         )
         ensure_collections(store)
-        settings = SettingsSource(store, config.defaults).get()
-        problem = settings.problem()
-        if not problem and not (config.races or settings.event_id or config.all_races):
-            problem = "No event set (or SAP_RACES / SAP_ALL_RACES)"
-        if problem:
-            logger.error(f"Invalid configuration: {problem}")
-            sys.exit(1)
-        sap = SapClient(
-            settings.sap_url,
-            bearer_token=settings.access_token,
-            timeout_seconds=config.request_timeout_seconds,
-        )
-        finder = None
-        if config.races:
-            races_provider = lambda: config.races
-        elif settings.event_id:
-            finder = RaceFinder(
-                sap,
-                settings.event_id,
-                settings.course_area or None,
-                refresh_seconds=config.race_refresh_seconds,
-            )
-            try:
-                finder.check()
-            except SapRejectedError as e:
-                logger.error(f"Invalid configuration: {e}")
-                sys.exit(1)
-            except SapError as e:
-                # SAP unreachable right now: the uplink keeps retrying the lookup
-                logger.warning(f"Could not check event {settings.event_id} yet: {e}")
-            races_provider = finder.current_races
-        else:
-            races_provider = lambda: None
-        uplink = Uplink(config, reader, sap, CursorStore(config.state_file), races_provider)
+        target = SapTarget(config, SettingsSource(store, config.defaults))
 
         signal.signal(signal.SIGINT, shutdown_handler)
         signal.signal(signal.SIGTERM, shutdown_handler)
@@ -144,34 +110,36 @@ def main():
             logger.info(f"Sources: all, excluding {', '.join(sorted(config.exclude_sources))}")
         else:
             logger.info("Sources: all")
-        if config.races:
-            races = ", ".join(f"{r['regattaName']} / {r['raceName']}" for r in config.races)
-            logger.info(f"Races: {races}")
-        elif finder:
-            area = f"course area '{settings.course_area}'" if settings.course_area else "all course areas"
-            logger.info(f"Races: current races of event {settings.event_id}, {area}")
-        else:
-            logger.warning("Races: every tracked race this login may update (SAP_ALL_RACES=true)")
 
         if args.backfill:
+            problem = target.refresh()
+            if problem:
+                logger.error(f"Invalid configuration: {problem}")
+                sys.exit(1)
+            uplink = Uplink(config, reader, target.sap, store=None)
             # The races running back then may be finished by now: offer every tracked
             # race, SAP only keeps the fixes inside each race's tracking interval
-            uplink.backfill(args.start, args.end, finder.all_tracked_races() if finder else None)
+            uplink.backfill(args.start, args.end, target.backfill_races())
             logger.info(f"✓ Backfill done: {uplink.stats}")
             return
 
-        uplink.init_cursor()
+        listener = None
         wakeups = None
         if config.realtime:
             # The listener thread only queues wake-ups; forwarding and the
             # cursor stay on this thread
             wakeups = queue.Queue()
-            RealtimeListener(
+            listener = RealtimeListener(
                 config.pocketbase_url,
                 config.exclude_sources,
                 on_wake=lambda: wakeups.put(None),
                 connect_timeout_seconds=config.request_timeout_seconds,
-            ).start()
+            )
+
+        uplink = Uplink(config, reader, None, CursorStore(config.state_file), target=target)
+        uplink.init_cursor()
+        if listener:
+            listener.start()
         logger.info(
             f"✓ SAP Sailing Uplink Service started successfully "
             f"(realtime {'on' if config.realtime else 'off'}, polling every {config.poll_seconds:g}s)"

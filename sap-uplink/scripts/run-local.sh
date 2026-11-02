@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Local development launcher for the SAP Sailing uplink service with env-only configuration.
-# SAP_URL, SAP_BEARER_TOKEN and SAP_RACES (or SAP_ALL_RACES) must be set by the caller.
+# The SAP settings come from PocketBase's sap_settings record or from SAP_* variables set by the caller.
 
 export POCKETBASE_URL="${POCKETBASE_URL:-http://localhost:8090}"
 export POCKETBASE_ADMIN_EMAIL="${POCKETBASE_ADMIN_EMAIL:-admin@example.com}"
