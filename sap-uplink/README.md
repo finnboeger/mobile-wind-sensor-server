@@ -78,7 +78,7 @@ SAP_REQUEST_TIMEOUT_SECONDS=30
 SAP_STATE_FILE=/data/cursor.json
 
 POCKETBASE_URL=http://pocketbase:8090
-LOG_LEVEL=info  # debug, info, warn, error
+LOG_LEVEL=info  # debug, info, warning, error
 ```
 
 `SAP_START_FROM` only applies when there is no saved cursor yet. To start over,
@@ -93,7 +93,42 @@ The user needs TRACKED_RACE:UPDATE permission on the target races. A wrong or
 expired token is not rejected: SAP then treats requests as anonymous and adds
 the wind to no race.
 
-## Development
+## Running
+
+### Local development
+
+The script creates a virtual environment, reads PocketBase at
+`http://localhost:8090` and keeps the cursor in `.state/`. Export the SAP
+settings first:
+
+```bash
+export SAP_URL=https://my-event.sapsailing.com
+export SAP_BEARER_TOKEN=...
+export SAP_RACES='[{"regattaName":"...","raceName":"..."}]'
+./scripts/run-local.sh
+```
+
+### Backfill
+
+The running service only sends what reaches PocketBase after its cursor, and
+drops fixes while no race is current. Backfill sends the measurements of a
+time range once and exits, without touching the cursor. Use it when:
+
+- a race was set up or its tracking started only after it was sailed,
+- a race's tracking interval was extended afterwards,
+- data is from before the service's first run (including records stored before
+  the `created_at` field existed).
+
+```bash
+./scripts/run-local.sh --backfill 2027-06-20T09:00:00Z --until 2027-06-20T15:00:00Z
+```
+
+- `--backfill FROM` and `--until TO` are ISO times of the measurement (`ts`),
+  sending `FROM < ts <= TO`. `--until` defaults to now.
+- The fixes go to the configured races (`SAP_RACES` or `SAP_ALL_RACES`). SAP
+  only keeps those inside a race's tracking interval.
+- It is safe to run again: SAP ignores fixes it already has for that wind
+  source.
 
 ### Tests
 
