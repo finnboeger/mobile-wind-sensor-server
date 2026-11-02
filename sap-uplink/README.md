@@ -68,6 +68,10 @@ SAP: heartbeat, settings problem, SAP server and
 race selection, realtime connection, cursor, when SAP last answered and last
 accepted fixes, the last error, the current and tracked races, and counters.
 
+For every race and source that SAP accepted fixes for, `sap_race_uploads`
+keeps the first and last accepted fix (one record each, publicly readable).
+It only covers fixes sent since it was added.
+
 ### Conversion
 
 | putWind field | from measurement |

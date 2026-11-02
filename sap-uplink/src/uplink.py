@@ -23,7 +23,7 @@ from src.config import UplinkConfig
 from src.convert import format_pocketbase_ts, to_wind_fix
 from src.pocketbase_reader import PocketbaseReader
 from src.sap_client import SapClient, SapRejectedError
-from src.status import UplinkStatus
+from src.status import RaceUploads, UplinkStatus
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,7 @@ class Uplink:
         races_provider: RacesProvider = lambda: None,
         target=None,
         status: Optional[UplinkStatus] = None,
+        uploads: Optional[RaceUploads] = None,
     ):
         """
         With a target (src.target.SapTarget), the SAP client and races come
@@ -86,6 +87,7 @@ class Uplink:
         self.races_provider = races_provider
         self.target = target
         self.status = status or UplinkStatus(None)
+        self.uploads = uploads or RaceUploads(None)
         self.cursor = ""
         # Failed rounds in a row, and when to try again (monotonic)
         self.failures = 0
@@ -112,6 +114,7 @@ class Uplink:
         while True:
             backlog = self.poll_once()
             self.status.tick()
+            self.uploads.flush()
             if backlog:
                 continue
             # While backing off, wake up when the retry is due
@@ -233,15 +236,16 @@ class Uplink:
                 answers = None
 
             if answers is not None:
-                accepted = self._log_answers(source_id, len(fixes), answers)
+                accepted = self._log_answers(source_id, fixes, answers)
                 self.stats["fixes_sent"] += len(fixes)
                 self.stats["fixes_accepted"] += accepted
                 self.status.sent(accepted > 0)
         else:
             logger.debug(f"{source_id}: {len(records)} record(s) without position or true wind, nothing to send")
 
-    def _log_answers(self, source_id: str, count: int, answers: List[Dict[str, Any]]) -> int:
-        """Log which races took the fixes; returns how many fixes at least one race accepted."""
+    def _log_answers(self, source_id: str, fixes: List[Dict[str, Any]], answers: List[Dict[str, Any]]) -> int:
+        """Log and report which races took the fixes; returns how many fixes at least one race accepted."""
+        count = len(fixes)
         # One answer per race SAP considered; "answer" holds a flag per fix,
         # false where the fix was outside that race's tracking interval.
         races = []
@@ -251,13 +255,14 @@ class Uplink:
             if not isinstance(flags, list):
                 # SAP answers with a message instead of flags, e.g. for an unsupported source type
                 continue
-            accepted = 0
+            timepoints = [fixes[i]["timepoint"] for i, ok in enumerate(flags[:count]) if ok]
+            accepted = len(timepoints)
             for i, ok in enumerate(flags[:count]):
                 if ok:
-                    accepted += 1
                     accepted_by_any[i] = True
             if accepted:
                 race = answer.get("regattaNameAndRaceName") or {}
+                self.uploads.record(source_id, race, min(timepoints), max(timepoints), accepted)
                 races.append(f"{race.get('regattaName')} / {race.get('raceName')} ({accepted})")
         if races:
             logger.info(f"{source_id}: sent {count} fix(es), accepted by {', '.join(races)}")
