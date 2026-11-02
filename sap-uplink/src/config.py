@@ -115,7 +115,10 @@ class UplinkConfig:
             raise ValueError("SAP_COURSE_AREA needs SAP_EVENT_ID")
         self.race_refresh_seconds = positive_number("SAP_RACE_REFRESH_SECONDS", "30")
 
-        self.poll_seconds = positive_number("SAP_POLL_SECONDS", "5")
+        # With realtime, new measurements wake the service right away and polling
+        # is only the fallback, so it can be rarer
+        self.realtime = flag("SAP_REALTIME", True)
+        self.poll_seconds = positive_number("SAP_POLL_SECONDS", "30" if self.realtime else "5")
         self.max_batch_size = positive_number("SAP_MAX_BATCH_SIZE", "200", int)
         self.request_timeout_seconds = positive_number("SAP_REQUEST_TIMEOUT_SECONDS", "30")
 

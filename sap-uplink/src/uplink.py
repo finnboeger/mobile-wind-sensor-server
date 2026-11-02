@@ -14,6 +14,7 @@ import json
 import logging
 import math
 import os
+import queue
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
@@ -26,6 +27,8 @@ from src.sap_client import SapClient, SapRejectedError
 logger = logging.getLogger(__name__)
 
 MAX_BACKOFF_SECONDS = 300
+# First retry delay; shorter than the poll interval when realtime makes polling rare
+RETRY_BASE_SECONDS = 5
 
 # Returns the races to send to: a list ({regattaName, raceName}), or None for
 # "no list" (SAP picks every tracked race the login may update)
@@ -87,10 +90,32 @@ class Uplink:
             logger.info(f"No saved cursor, starting after {self.cursor}")
             self.store.save(self.cursor)
 
-    def run_forever(self) -> None:
+    def run_forever(self, wakeups: Optional["queue.Queue[None]"] = None) -> None:
+        """
+        Forward a batch every poll interval, right away while there is a
+        backlog, and, with a wake-up queue (fed by the realtime listener), as
+        soon as something arrives on it.
+        """
         while True:
-            if not self.poll_once():
-                time.sleep(self.config.poll_seconds)
+            if self.poll_once():
+                continue
+            # While backing off, wake up when the retry is due
+            timeout = self.config.poll_seconds
+            if self.retry_at > time.monotonic():
+                timeout = min(timeout, self.retry_at - time.monotonic())
+            if wakeups is None:
+                time.sleep(timeout)
+                continue
+            try:
+                wakeups.get(timeout=timeout)
+            except queue.Empty:
+                continue
+            # One read covers every announcement queued so far
+            while True:
+                try:
+                    wakeups.get_nowait()
+                except queue.Empty:
+                    break
 
     def poll_once(self) -> bool:
         """Send the next batch unless backing off; True if more may be waiting."""
@@ -108,8 +133,9 @@ class Uplink:
         return backlog
 
     def backoff_seconds(self, failures: int) -> float:
-        max_exponent = max(0, math.ceil(math.log2(MAX_BACKOFF_SECONDS / self.config.poll_seconds)))
-        return min(self.config.poll_seconds * 2 ** min(failures, max_exponent), MAX_BACKOFF_SECONDS)
+        base = min(self.config.poll_seconds, RETRY_BASE_SECONDS)
+        max_exponent = max(0, math.ceil(math.log2(MAX_BACKOFF_SECONDS / base)))
+        return min(base * 2 ** min(failures, max_exponent), MAX_BACKOFF_SECONDS)
 
     def forward_new(self) -> bool:
         """Send the next batch stored after the cursor; True if more may be waiting."""

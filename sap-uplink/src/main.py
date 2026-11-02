@@ -3,7 +3,7 @@
 SAP Sailing Uplink Service
 
 Docker service that:
-- Polls the PocketBase measurements collection for new true wind data
+- Picks up new true wind data from PocketBase (realtime subscription, polling as fallback)
 - Forwards it to SAP Sailing Analytics via the putWind API
 - Keeps a cursor so outages on either side lose no data
 
@@ -16,6 +16,7 @@ Configuration via environment variables, see README.md.
 
 import argparse
 import logging
+import queue
 import signal
 import sys
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ from datetime import datetime, timezone
 from src.config import UplinkConfig, parse_timestamp
 from src.pocketbase_reader import PocketbaseReader
 from src.race_finder import RaceFinder
+from src.realtime import RealtimeListener
 from src.sap_client import SapClient, SapError, SapRejectedError
 from src.uplink import CursorStore, Uplink
 
@@ -141,8 +143,22 @@ def main():
             return
 
         uplink.init_cursor()
-        logger.info("✓ SAP Sailing Uplink Service started successfully")
-        uplink.run_forever()
+        wakeups = None
+        if config.realtime:
+            # The listener thread only queues wake-ups; forwarding and the
+            # cursor stay on this thread
+            wakeups = queue.Queue()
+            RealtimeListener(
+                config.pocketbase_url,
+                config.exclude_sources,
+                on_wake=lambda: wakeups.put(None),
+                connect_timeout_seconds=config.request_timeout_seconds,
+            ).start()
+        logger.info(
+            f"✓ SAP Sailing Uplink Service started successfully "
+            f"(realtime {'on' if config.realtime else 'off'}, polling every {config.poll_seconds:g}s)"
+        )
+        uplink.run_forever(wakeups)
 
     except Exception:
         logger.exception("SAP Sailing Uplink Service failed")
