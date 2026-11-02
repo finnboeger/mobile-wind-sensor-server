@@ -24,6 +24,7 @@ class PocketbaseStore:
         self.timeout_seconds = timeout_seconds
         self.session = requests.Session()
         self._token: Optional[str] = None
+        # The backfill thread shares the store
         self._lock = threading.Lock()
 
     def get_collection(self, name: str) -> Optional[Dict[str, Any]]:

@@ -191,7 +191,13 @@ class Uplink:
         self.status.update(cursor=self.cursor)
         return len(records) == self.config.max_batch_size
 
-    def backfill(self, start: datetime, end: datetime, races: Optional[List[Dict[str, str]]] = None) -> None:
+    def backfill(
+        self,
+        start: datetime,
+        end: datetime,
+        races: Optional[List[Dict[str, str]]] = None,
+        on_page: Callable[[], None] = lambda: None,
+    ) -> None:
         """
         Send a measurement time range once, independent of the cursor (e.g. after a
         long data gap). With `races`, send to those instead of the current races.
@@ -204,6 +210,7 @@ class Uplink:
         for page in self.reader.iter_range(after, until, self.config.max_batch_size):
             for source_id, records in self._by_source(page).items():
                 self._send(source_id, records)
+            on_page()
 
     def _by_source(self, records: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """Group records by source, in arrival order, leaving out excluded sources."""
