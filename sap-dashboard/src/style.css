@@ -56,6 +56,31 @@ dl {
 dt { color: #666; }
 dd { overflow-wrap: anywhere; }
 
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th {
+  text-align: left;
+  font-weight: 600;
+  color: #666;
+  font-size: 0.8rem;
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid #e5e7ee;
+  white-space: nowrap;
+}
+
+td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid #f0f1f5;
+  vertical-align: top;
+}
+
+
 .banner {
   padding: 10px 14px;
   border-radius: 8px;
