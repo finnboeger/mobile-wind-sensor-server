@@ -55,6 +55,25 @@ COLLECTIONS: List[Dict[str, Any]] = [
         ],
         "public_read": True,
     },
+    {
+        # Per race and source: the range of fixes SAP accepted
+        "name": "sap_race_uploads",
+        "fields": [
+            text("regatta_name"),
+            text("race_name"),
+            text("source_id"),
+            field("first_fix", "date"),
+            field("last_fix", "date"),
+            field("fixes_accepted", "number"),
+            field("last_accepted_at", "date"),
+            autodate("updated", True),
+        ],
+        "indexes": [
+            "CREATE UNIQUE INDEX `idx_sap_race_uploads_race_source` ON `sap_race_uploads` "
+            "(`regatta_name`, `race_name`, `source_id`)"
+        ],
+        "public_read": True,
+    },
 ]
 
 
