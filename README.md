@@ -72,7 +72,7 @@ docker-compose down
 
 See [Docker Deployment Guide](#docker-deployment).
 
-Optional: set `COMPOSE_PROFILES=sap` to also run the SAP Sailing uplink, which forwards true wind to [SAP Sailing Analytics](https://www.sapsailing.com) races. See [sap-uplink/README.md](sap-uplink/README.md).
+Optional: add `mosquitto` to `COMPOSE_PROFILES` to run the stack's own MQTT broker (see [Self-hosted MQTT broker](#self-hosted-mqtt-broker)), and `sap` to also run the SAP Sailing uplink, which forwards true wind to [SAP Sailing Analytics](https://www.sapsailing.com) races. See [sap-uplink/README.md](sap-uplink/README.md).
 
 ### Bare-Metal
 
@@ -343,10 +343,11 @@ docker-compose down -v
 
 ### Self-hosted MQTT broker
 
-The stack includes a Mosquitto broker (`mosquitto` service) with a plain
-listener on port 1883 that is only reachable inside the docker network.
-`mqtt-ingestion` connects to it directly. The boats connect over TLS through a
-reverse proxy that terminates TLS and forwards to `mosquitto:1883`.
+The stack can run its own Mosquitto broker (`mosquitto` service). It is off by
+default; enable it with the `mosquitto` compose profile. It has a plain
+listener on port 1883 that is only reachable inside the docker network, which
+`mqtt-ingestion` connects to directly. The boats connect over TLS through a
+reverse proxy that terminates TLS and forwards to `mosquitto:1883`;
 `docker-compose.traefik.yml` does this with Traefik.
 
 1. Point a DNS name (e.g. `mqtt.example.com`) at the server.
@@ -357,8 +358,10 @@ reverse proxy that terminates TLS and forwards to `mosquitto:1883`.
    ```
    Traefik gets the certificate from its certificate resolver like for any
    other router (it routes by SNI, which the boats send).
-3. Create one user for the ingestion service and one per boat. A boat may
-   only publish to the topic named like its user:
+3. Create the users **before starting the broker**; Mosquitto exits if
+   `mosquitto/config/passwd` doesn't exist. One user `ingestion` for the
+   ingestion service and one per boat. A boat may only publish to the topic
+   named like its user:
    ```bash
    ./mosquitto/add-user.sh ingestion
    ./mosquitto/add-user.sh bot1
@@ -367,11 +370,8 @@ reverse proxy that terminates TLS and forwards to `mosquitto:1883`.
    the credentials as `MOSQUITTO_USER` and `MOSQUITTO_PASSWORD` instead.
 4. Configure `.env`:
    ```bash
-   MQTT_HOST=mosquitto
-   MQTT_PORT=1883
-   MQTT_USE_TLS=false
-   MQTT_USER=ingestion
-   MQTT_PASSWORD=...
+   COMPOSE_PROFILES=mosquitto
+   MQTT_PASSWORD=...                # password of the ingestion user
    MQTT_TOPICS=bot1=bot1
 
    MQTT_DOMAIN=mqtt.example.com
@@ -379,6 +379,9 @@ reverse proxy that terminates TLS and forwards to `mosquitto:1883`.
    TRAEFIK_MQTT_ENTRYPOINT=mqtts
    TRAEFIK_CERTRESOLVER=letsencrypt
    ```
+   With the profile set, the ingestion service defaults to the stack's broker:
+   `MQTT_HOST=mosquitto`, `MQTT_PORT=1883`, `MQTT_USE_TLS=false` and
+   `MQTT_USER=ingestion`. Without it, `MQTT_HOST` is required and TLS is on.
 5. Start the stack with the Traefik labels:
    ```bash
    docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d

@@ -13,15 +13,21 @@ from typing import Dict
 
 class MqttConfig:
     def __init__(self):
-        self.mqtt_host = os.getenv("MQTT_HOST")
+        # COMPOSE_PROFILES=mosquitto runs the stack's own broker; it then is the
+        # default: plain MQTT inside the docker network, login "ingestion"
+        profiles = [p.strip() for p in os.getenv("COMPOSE_PROFILES", "").split(",")]
+        builtin_broker = "mosquitto" in profiles
+
+        # Empty values count as unset, so docker-compose can pass them through
+        self.mqtt_host = os.getenv("MQTT_HOST") or ("mosquitto" if builtin_broker else None)
         if not self.mqtt_host:
             raise ValueError("Missing MQTT_HOST environment variable")
 
-        self.mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
-        self.mqtt_user = os.getenv("MQTT_USER")
+        self.mqtt_port = int(os.getenv("MQTT_PORT") or "1883")
+        self.mqtt_user = os.getenv("MQTT_USER") or ("ingestion" if builtin_broker else None)
         self.mqtt_password = os.getenv("MQTT_PASSWORD")
-        # TLS is on by default; turn it off for a broker on the internal docker network
-        use_tls = os.getenv("MQTT_USE_TLS", "true").strip().lower()
+        # TLS is on by default, except for the stack's own broker
+        use_tls = (os.getenv("MQTT_USE_TLS") or ("false" if builtin_broker else "true")).strip().lower()
         if use_tls not in ("1", "true", "yes", "0", "false", "no"):
             raise ValueError(f"MQTT_USE_TLS must be true or false, got {use_tls!r}")
         self.mqtt_use_tls = use_tls in ("1", "true", "yes")
