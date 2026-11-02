@@ -22,7 +22,8 @@ from datetime import datetime, timezone
 
 from src.config import UplinkConfig, parse_timestamp
 from src.pocketbase_reader import PocketbaseReader
-from src.sap_client import SapClient
+from src.race_finder import RaceFinder
+from src.sap_client import SapClient, SapError, SapRejectedError
 from src.uplink import CursorStore, Uplink
 
 logging.basicConfig(
@@ -93,8 +94,25 @@ def main():
             bearer_token=config.sap_bearer_token,
             timeout_seconds=config.request_timeout_seconds,
         )
+        finder = None
         if config.races:
             races_provider = lambda: config.races
+        elif config.event_id:
+            finder = RaceFinder(
+                sap,
+                config.event_id,
+                config.course_area,
+                refresh_seconds=config.race_refresh_seconds,
+            )
+            try:
+                finder.check()
+            except SapRejectedError as e:
+                logger.error(f"Invalid configuration: {e}")
+                sys.exit(1)
+            except SapError as e:
+                # SAP unreachable right now: the uplink keeps retrying the lookup
+                logger.warning(f"Could not check SAP_EVENT_ID yet: {e}")
+            races_provider = finder.current_races
         else:
             races_provider = lambda: None
         uplink = Uplink(config, reader, sap, CursorStore(config.state_file), races_provider)
@@ -109,11 +127,16 @@ def main():
         if config.races:
             races = ", ".join(f"{r['regattaName']} / {r['raceName']}" for r in config.races)
             logger.info(f"Races: {races}")
+        elif finder:
+            area = f"course area '{config.course_area}'" if config.course_area else "all course areas"
+            logger.info(f"Races: current races of event {config.event_id}, {area}")
         else:
             logger.warning("Races: every tracked race this login may update (SAP_ALL_RACES=true)")
 
         if args.backfill:
-            uplink.backfill(args.start, args.end)
+            # The races running back then may be finished by now: offer every tracked
+            # race, SAP only keeps the fixes inside each race's tracking interval
+            uplink.backfill(args.start, args.end, finder.all_tracked_races() if finder else None)
             logger.info(f"✓ Backfill done: {uplink.stats}")
             return
 

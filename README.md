@@ -145,6 +145,7 @@ wind-dashboard/
 │   │   ├── uplink.py                    # Cursor, batching, retries
 │   │   ├── pocketbase_reader.py         # Reads measurements
 │   │   ├── sap_client.py                # putWind client
+│   │   ├── race_finder.py               # Current races of an event
 │   │   └── convert.py                   # Measurement → wind fix
 │   ├── tests/
 │   ├── scripts/run-local.sh
