@@ -76,6 +76,13 @@ def parse_timestamp(value: str) -> datetime:
     return ts.astimezone(timezone.utc)
 
 
+def required(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise ValueError(f"Missing {name} environment variable")
+    return value
+
+
 class UplinkConfig:
     def __init__(self):
         self.sap_url = required_url("SAP_URL", "https://my-event.sapsailing.com")
@@ -130,7 +137,10 @@ class UplinkConfig:
 
         self.state_file = os.getenv("SAP_STATE_FILE", "/data/cursor.json")
 
-        # PocketBase (measurements are publicly readable, no login needed)
+        # PocketBase: measurements are publicly readable, the uplink's own
+        # collections (settings, status, upload results) need a superuser
         self.pocketbase_url = required_url("POCKETBASE_URL", "http://pocketbase:8090")
+        self.pocketbase_email = required("POCKETBASE_ADMIN_EMAIL")
+        self.pocketbase_password = required("POCKETBASE_ADMIN_PASSWORD")
 
         self.log_level = os.getenv("LOG_LEVEL", "info").lower()

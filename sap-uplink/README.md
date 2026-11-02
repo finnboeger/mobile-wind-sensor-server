@@ -92,6 +92,8 @@ SAP_RACE_REFRESH_SECONDS=30       # how often the current races are looked up (a
 SAP_STATE_FILE=/data/cursor.json
 
 POCKETBASE_URL=http://pocketbase:8090
+POCKETBASE_ADMIN_EMAIL=           # superuser, for the uplink's own collections
+POCKETBASE_ADMIN_PASSWORD=
 LOG_LEVEL=info  # debug, info, warning, error
 ```
 
