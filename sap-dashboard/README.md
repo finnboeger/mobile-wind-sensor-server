@@ -21,6 +21,14 @@ SAP uplink's own collections (see `sap-uplink/README.md`).
   and the sources.
 - **Backfills** and how they went.
 
+## Settings
+
+⚙ sets the SAP server, access token, event id and course area, after logging
+in as a PocketBase superuser. They go to the uplink's `sap_settings` record,
+which wins over its `SAP_URL`, `SAP_BEARER_TOKEN`, `SAP_EVENT_ID` and
+`SAP_COURSE_AREA`; empty fields fall back to those. The uplink picks them up
+within about 10 seconds.
+
 ## Running
 
 With Docker it runs behind the `sap` compose profile, next to the uplink, on
