@@ -363,6 +363,8 @@ reverse proxy that terminates TLS and forwards to `mosquitto:1883`.
    ./mosquitto/add-user.sh ingestion
    ./mosquitto/add-user.sh bot1
    ```
+   The script prompts for the password. To run it without a terminal, pass
+   the credentials as `MOSQUITTO_USER` and `MOSQUITTO_PASSWORD` instead.
 4. Configure `.env`:
    ```bash
    MQTT_HOST=mosquitto
