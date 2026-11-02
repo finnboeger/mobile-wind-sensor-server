@@ -119,7 +119,7 @@ async function ensureFields(pb: PocketBase, collection: any): Promise<void> {
   });
 }
 
-function getRequiredFields(): Array<{ name: string; type: string; required: boolean }> {
+function getRequiredFields(): Array<{ name: string; type: string; [option: string]: unknown }> {
   return [
     { name: "source_id", type: "text", required: true },
     { name: "ts", type: "date", required: true },
@@ -131,19 +131,47 @@ function getRequiredFields(): Array<{ name: string; type: string; required: bool
     { name: "true_wind_speed_mps", type: "number", required: false },
     { name: "apparent_wind_dir_deg", type: "number", required: false },
     { name: "apparent_wind_speed_mps", type: "number", required: false },
+    // When the record reached PocketBase. The SAP uplink uses it as its cursor,
+    // so measurements that arrive late (with an old ts) are still forwarded.
+    { name: "created_at", type: "autodate", onCreate: true, onUpdate: false },
   ];
 }
 
+// Indexes on the measurements collection, by name
+const INDEXES: Record<string, (collectionName: string) => string> = {
+  // The SAP uplink polls for records stored after its cursor
+  idx_measurements_created_at: (c) => `CREATE INDEX \`idx_measurements_created_at\` ON \`${c}\` (\`created_at\`)`,
+  // mqtt-ingestion looks up a record by source and timestamp before every write,
+  // and the dashboard reads a source's time range
+  idx_measurements_source_ts: (c) => `CREATE UNIQUE INDEX \`idx_measurements_source_ts\` ON \`${c}\` (\`source_id\`, \`ts\`)`,
+  // Time-range queries across all sources
+  idx_measurements_ts: (c) => `CREATE INDEX \`idx_measurements_ts\` ON \`${c}\` (\`ts\`)`,
+};
+
 async function ensureIndexes(pb: PocketBase, collectionName: string): Promise<void> {
-  // PocketBase uses different API for indexes - this would depend on version
-  // For now, document that indexes should be:
-  // 1. Unique index on (source_id, ts)
-  // 2. Index on source_id for filtering
-  // 3. Index on ts for time-range queries
-  console.log("Note: Ensure the following indexes exist in PocketBase:");
-  console.log("  - Unique: (source_id, ts)");
-  console.log("  - Index: source_id");
-  console.log("  - Index: ts");
+  const collection = await pb.collections.getOne(collectionName);
+  const indexes: string[] = collection.indexes || [];
+  const missing = Object.entries(INDEXES).filter(
+    ([name]) => !indexes.some((sql) => sql.includes(`\`${name}\``))
+  );
+
+  // One at a time, so an index that can't be created (e.g. the unique index
+  // while duplicate rows exist) doesn't hold back the others
+  for (const [name, sql] of missing) {
+    console.log(`Adding index: ${name}`);
+    try {
+      await pb.collections.update(collection.id, { indexes: [...indexes, sql(collectionName)] });
+      indexes.push(sql(collectionName));
+    } catch (error) {
+      // PocketBase's own message is generic; the details are in response.data
+      const details = (error as { response?: { data?: unknown } })?.response?.data;
+      console.error(
+        `Failed to add index ${name}:`,
+        error instanceof Error ? error.message : error,
+        details ? JSON.stringify(details) : ""
+      );
+    }
+  }
 }
 
 async function applySecurityRules(pb: PocketBase, collectionName: string): Promise<void> {
