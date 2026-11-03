@@ -32,9 +32,12 @@ All configuration via environment variables (Docker-only):
 ```bash
 # MQTT Broker
 MQTT_HOST=mosquitto           # MQTT broker hostname/IP
-MQTT_PORT=1883                # MQTT broker port
+MQTT_PORT=1883                # MQTT broker port (default 1883)
 MQTT_USER=                     # Optional: MQTT username
 MQTT_PASSWORD=                 # Optional: MQTT password
+MQTT_USE_TLS=true              # TLS to the broker (default true)
+# With COMPOSE_PROFILES containing "mosquitto", empty MQTT_HOST, MQTT_USER and
+# MQTT_USE_TLS default to the stack's broker: mosquitto, ingestion, false
 
 # MQTT Topics (required)
 MQTT_TOPICS=wind/sensor1=sensor_1,wind/sensor2=sensor_2

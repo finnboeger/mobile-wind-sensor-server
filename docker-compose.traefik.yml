@@ -1,0 +1,27 @@
+# Example: publish the mosquitto broker through an existing Traefik instance,
+# which terminates TLS and forwards plain MQTT to mosquitto:1883.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+#
+# Traefik needs a TCP entrypoint for MQTT over TLS, e.g. in its static config
+#   --entrypoints.mqtts.address=:8883
+# and a certificate resolver. See "Self-hosted MQTT broker" in README.md.
+
+services:
+  mosquitto:
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.tcp.routers.mqtt.rule=HostSNI(`${MQTT_DOMAIN:?set MQTT_DOMAIN}`)
+      - traefik.tcp.routers.mqtt.entrypoints=${TRAEFIK_MQTT_ENTRYPOINT:-mqtts}
+      - traefik.tcp.routers.mqtt.tls=true
+      - traefik.tcp.routers.mqtt.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.tcp.services.mqtt.loadbalancer.server.port=1883
+    networks:
+      - wind-network
+      - traefik
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}

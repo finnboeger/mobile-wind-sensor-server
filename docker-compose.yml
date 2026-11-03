@@ -75,10 +75,15 @@ services:
     container_name: wind-mqtt-ingestion
     environment:
       # MQTT configuration
-      MQTT_HOST: ${MQTT_HOST:-mosquitto}
-      MQTT_PORT: ${MQTT_PORT:-1883}
+      # Empty values fall back to defaults in mqtt-ingestion/src/config.py: an
+      # external broker over TLS, or with COMPOSE_PROFILES=mosquitto the stack's
+      # own broker (host mosquitto, port 1883, no TLS, user "ingestion")
+      MQTT_HOST: ${MQTT_HOST:-}
+      MQTT_PORT: ${MQTT_PORT:-}
       MQTT_USER: ${MQTT_USER:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_USE_TLS: ${MQTT_USE_TLS:-}
+      COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       MQTT_TOPICS: ${MQTT_TOPICS:-wind/sensor1=sensor_1,wind/sensor2=sensor_2}
 
       # PocketBase configuration
@@ -94,20 +99,25 @@ services:
         condition: service_healthy
       dashboard-server:
         condition: service_healthy
+      mosquitto:
+        condition: service_started
+        required: false
     networks:
       - wind-network
     restart: unless-stopped
 
-  # Optional: Mosquitto MQTT broker (for testing)
+  # Mosquitto MQTT broker on plain 1883 inside the docker network. The boats
+  # reach it through a TLS-terminating reverse proxy (docker-compose.traefik.yml).
+  # Off by default; enable with COMPOSE_PROFILES=mosquitto. Create its users
+  # first, it won't start without mosquitto/config/passwd.
+  # Setup: see "Self-hosted MQTT broker" in README.md
   mosquitto:
-    image: eclipse-mosquitto:latest
+    image: eclipse-mosquitto:2
+    profiles: ["mosquitto"]
     container_name: wind-mosquitto
-    ports:
-      - "${MOSQUITTO_PORT:-1883}:1883"
     volumes:
-      - mosquitto_config:/mosquitto/config
+      - ./mosquitto/config:/mosquitto/config
       - mosquitto_data:/mosquitto/data
-      - mosquitto_logs:/mosquitto/log
     environment:
       - TZ=${TZ:-UTC}
     networks:
@@ -164,7 +174,5 @@ networks:
 volumes:
   pocketbase_data:
   pocketbase_migrations:
-  mosquitto_config:
   mosquitto_data:
-  mosquitto_logs:
   sap_uplink_data:
