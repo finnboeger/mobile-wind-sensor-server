@@ -42,6 +42,14 @@ export default defineComponent({
     let sourceIds: string[] = [];
     let sourcesFoundAt = 0;
 
+    // Each flush of the uplink updates one record per race and source: reload once
+    let uploadsTimer: number | undefined;
+    function loadUploadsSoon(): Promise<void> {
+      window.clearTimeout(uploadsTimer);
+      uploadsTimer = window.setTimeout(() => loadUploads().catch(() => {}), 1000);
+      return Promise.resolve();
+    }
+
     async function loadUploads() {
       uploads.value = await pb.value!.collection("sap_race_uploads").getFullList<RaceUpload>({ requestKey: null });
     }
@@ -78,7 +86,7 @@ export default defineComponent({
       const subscribe = (collection: string, load: () => Promise<void>) =>
         pb.value!.collection(collection).subscribe("*", () => load().catch(() => {})).catch(() => {});
       subscribe("sap_uplink_status", loadStatus);
-      subscribe("sap_race_uploads", loadUploads);
+      subscribe("sap_race_uploads", loadUploadsSoon);
       timers.push(window.setInterval(() => loadMeasurements().catch(() => {}), 5000));
       timers.push(window.setInterval(loadAll, 30000));
     });
