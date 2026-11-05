@@ -4,6 +4,7 @@ settings. Rebuilt whenever the settings change.
 """
 
 import logging
+import time
 from typing import Dict, List, Optional
 
 from src.config import UplinkConfig
@@ -12,6 +13,10 @@ from src.sap_client import SapClient, SapError, SapRejectedError
 from src.settings import SapSettings, SettingsSource
 
 logger = logging.getLogger(__name__)
+
+# How often to look the event up again after SAP said it doesn't exist (it may
+# just not be published yet)
+REJECTED_RECHECK_SECONDS = 60
 
 
 class SapTarget:
@@ -23,11 +28,14 @@ class SapTarget:
         self.sap: Optional[SapClient] = None
         self.finder: Optional[RaceFinder] = None
         self.problem: Optional[str] = "Not configured yet"
+        # When to check a rejected event again (monotonic), None if it wasn't rejected
+        self._recheck_at: Optional[float] = None
 
     def refresh(self) -> Optional[str]:
         """Pick up changed settings; returns why nothing can be sent, or None."""
         settings = self.settings_source.get()
-        if settings != self.settings:
+        recheck = self._recheck_at is not None and time.monotonic() >= self._recheck_at
+        if settings != self.settings or recheck:
             self._build(settings)
         return self.problem
 
@@ -55,6 +63,7 @@ class SapTarget:
     def _build(self, settings: SapSettings) -> None:
         self.settings = settings
         self.sap = self.finder = None
+        self._recheck_at = None
         self.problem = settings.problem()
         if not self.problem and not (self.config.races or settings.event_id or self.config.all_races):
             self.problem = "No event set (or SAP_RACES / SAP_ALL_RACES)"
@@ -81,7 +90,8 @@ class SapTarget:
                 self.finder.check()
             except SapRejectedError as e:
                 self.problem = str(e)
-                logger.error(f"Not sending to SAP: {e}")
+                self._recheck_at = time.monotonic() + REJECTED_RECHECK_SECONDS
+                logger.error(f"Not sending to SAP: {e} (checking again in {REJECTED_RECHECK_SECONDS}s)")
                 return
             except SapError as e:
                 # SAP unreachable right now: the lookup is retried with every batch
