@@ -24,11 +24,19 @@ class SapSettings:
     course_area: str = ""
 
     def merged_over(self, defaults: "SapSettings") -> "SapSettings":
+        """
+        Fill empty fields from the defaults. A token and a course area only
+        belong to their own server and event: the default token isn't sent to a
+        different server, and the default course area isn't applied to a
+        different event.
+        """
+        same_server = not self.sap_url or self.sap_url == defaults.sap_url
+        same_event = not self.event_id or self.event_id == defaults.event_id
         return SapSettings(
             sap_url=self.sap_url or defaults.sap_url,
-            access_token=self.access_token or defaults.access_token,
+            access_token=self.access_token or (defaults.access_token if same_server else ""),
             event_id=self.event_id or defaults.event_id,
-            course_area=self.course_area or defaults.course_area,
+            course_area=self.course_area or (defaults.course_area if same_event else ""),
         )
 
     def problem(self) -> Optional[str]:
@@ -40,7 +48,7 @@ class SapSettings:
         if self.sap_url.endswith("/sailingserver"):
             return "SAP server must not include the /sailingserver path"
         if not self.access_token:
-            return "No access token set"
+            return f"No access token set for {self.sap_url}"
         if self.course_area and not self.event_id:
             return "A course area needs an event"
         return None
