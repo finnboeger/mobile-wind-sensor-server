@@ -31,6 +31,31 @@ class BackfillWorkerTest(unittest.TestCase):
         self.assertEqual(sap.races, [[{"regattaName": "R", "raceName": "1"}]])
         self.assertEqual((job["status"], job["fixes_sent"], job["fixes_accepted"]), ("done", 2, 2))
 
+    def test_keeps_running_when_pocketbase_fails_mid_job(self):
+        jobs = [{"id": "b1", "race_name": "", "range_from": ts(0), "range_until": ts(2), "status": "pending"}]
+        worker = None
+
+        class DownStore:
+            def list(self, collection, filter_query, sort="", per_page=200):
+                if filter_query == 'status = "running"':
+                    return []
+                if not jobs:
+                    worker.stop_event.set()
+                return [jobs.pop()] if jobs else []
+
+            def update(self, collection, record_id, data):
+                raise RuntimeError("PocketBase down")
+
+        worker = BackfillWorker(SimpleNamespace(), DownStore(), RaceUploads(None))
+        with mock.patch("src.backfill_jobs.POLL_SECONDS", 0):
+            worker.run()
+        self.assertEqual(jobs, [])
+
+    def test_a_bad_range_fails_the_job(self):
+        job = {"id": "b1", "race_name": "", "range_from": "", "range_until": ts(2), "status": "pending"}
+        BackfillWorker(SimpleNamespace(), FakeStore(job), RaceUploads(None)).run_job(job)
+        self.assertEqual(job["status"], "failed")
+
 
 if __name__ == "__main__":
     unittest.main()

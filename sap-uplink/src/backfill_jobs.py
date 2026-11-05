@@ -44,19 +44,25 @@ class BackfillWorker:
             if job is None:
                 self.stop_event.wait(POLL_SECONDS)
                 continue
-            self.run_job(job)
+            try:
+                self.run_job(job)
+            except Exception as e:
+                # Only marking the job failed went wrong (PocketBase down): the
+                # thread must live on, or every later request stays pending
+                logger.error(f"Backfill {job.get('id')} failed: {e}")
+                self.stop_event.wait(POLL_SECONDS)
 
     def run_job(self, job: Dict[str, Any]) -> None:
         job_id = job["id"]
-        race = {"regattaName": job["regatta_name"], "raceName": job["race_name"]} if job.get("race_name") else None
+        race = {"regattaName": job.get("regatta_name") or "", "raceName": job["race_name"]} if job.get("race_name") else None
         name = f"{race['regattaName']} / {race['raceName']}" if race else "every tracked race"
-        start = parse_pocketbase_ts(job["range_from"])
-        end = parse_pocketbase_ts(job["range_until"])
-        self.store.update(BACKFILLS_COLLECTION, job_id, {"status": "running", "started_at": now_ts(), "message": ""})
-        logger.info(f"Backfill requested: {name}, {start.isoformat()} .. {end.isoformat()}")
 
         uplink = None
         try:
+            start = parse_pocketbase_ts(job.get("range_from") or "")
+            end = parse_pocketbase_ts(job.get("range_until") or "")
+            self.store.update(BACKFILLS_COLLECTION, job_id, {"status": "running", "started_at": now_ts(), "message": ""})
+            logger.info(f"Backfill requested: {name}, {start.isoformat()} .. {end.isoformat()}")
             target = SapTarget(self.config, SettingsSource(self.store, self.config.defaults))
             problem = target.refresh()
             if problem:
