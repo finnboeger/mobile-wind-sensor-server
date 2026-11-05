@@ -31,7 +31,7 @@ export default defineComponent({
           bySource.set(m.source_id, entry);
         }
         // Same rule as the uplink's convert.py: 0/0 is a GPS without fix
-        const hasPosition = !!m.gps_lat && !!m.gps_lng;
+        const hasPosition = m.gps_lat != null && m.gps_lng != null && !(m.gps_lat === 0 && m.gps_lng === 0);
         const hasWind = m.true_wind_dir_deg != null && m.true_wind_speed_mps != null;
         if (hasPosition && hasWind && tsMs !== null && (entry.sendableTsMs === null || tsMs > entry.sendableTsMs)) {
           entry.sendableTsMs = tsMs;
