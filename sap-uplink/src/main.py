@@ -145,7 +145,7 @@ def main():
                 "current_races": target.last_current_races(),
                 "all_races": not target.problem and not config.races and target.finder is None,
                 "tracked_races": target.tracked_races(),
-                "stats": uplink.stats if uplink else {},
+                "stats": dict(uplink.stats) if uplink else {},
             }
 
         status = UplinkStatus(store, extra=live_status)
@@ -153,6 +153,7 @@ def main():
         uplink.init_cursor()
         if listener:
             listener.start()
+        status.start()
         logger.info(
             f"✓ SAP Sailing Uplink Service started successfully "
             f"(realtime {'on' if config.realtime else 'off'}, polling every {config.poll_seconds:g}s)"
