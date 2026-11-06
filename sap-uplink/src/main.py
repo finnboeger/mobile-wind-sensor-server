@@ -6,7 +6,7 @@ Docker service that:
 - Picks up new true wind data from PocketBase (realtime subscription, polling as fallback)
 - Forwards it to SAP Sailing Analytics via the putWind API
 - Keeps a cursor so outages on either side lose no data
-- Takes its SAP settings from PocketBase
+- Takes its SAP settings from PocketBase and reports its status there
 
 Usage:
   python -m src.main                              # run continuously
@@ -28,6 +28,7 @@ from src.pocketbase_reader import PocketbaseReader
 from src.pocketbase_store import PocketbaseStore
 from src.realtime import RealtimeListener
 from src.settings import SettingsSource
+from src.status import UplinkStatus
 from src.target import SapTarget
 from src.uplink import CursorStore, Uplink
 
@@ -136,10 +137,23 @@ def main():
                 connect_timeout_seconds=config.request_timeout_seconds,
             )
 
-        uplink = Uplink(config, reader, None, CursorStore(config.state_file), target=target)
+        uplink = None
+
+        def live_status():
+            return {
+                "realtime": ("connected" if listener.connected else "disconnected") if listener else "off",
+                "current_races": target.last_current_races(),
+                "all_races": not target.problem and not config.races and target.finder is None,
+                "tracked_races": target.tracked_races(),
+                "stats": dict(uplink.stats) if uplink else {},
+            }
+
+        status = UplinkStatus(store, extra=live_status)
+        uplink = Uplink(config, reader, None, CursorStore(config.state_file), target=target, status=status)
         uplink.init_cursor()
         if listener:
             listener.start()
+        status.start()
         logger.info(
             f"✓ SAP Sailing Uplink Service started successfully "
             f"(realtime {'on' if config.realtime else 'off'}, polling every {config.poll_seconds:g}s)"

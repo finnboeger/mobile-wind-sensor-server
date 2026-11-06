@@ -69,6 +69,7 @@ class RealtimeListener:
         self.session = requests.Session()
         self.stop_event = threading.Event()
         self.thread: Optional[threading.Thread] = None
+        self.connected = False
 
     def start(self) -> None:
         self.thread = threading.Thread(target=self.run, name="pocketbase-realtime", daemon=True)
@@ -82,7 +83,9 @@ class RealtimeListener:
         while not self.stop_event.is_set():
             try:
                 subscribed = self.listen_once()
+                self.connected = False
             except Exception as e:
+                self.connected = False
                 logger.info(f"Realtime connection lost: {e}")
                 subscribed = False
             else:
@@ -112,7 +115,7 @@ class RealtimeListener:
                     break
                 if event == "PB_CONNECT":
                     self._subscribe(json.loads(data)["clientId"])
-                    subscribed = True
+                    subscribed = self.connected = True
                     logger.info(f"Subscribed to PocketBase realtime ({TOPIC})")
                     self.on_wake()
                 elif event == TOPIC:

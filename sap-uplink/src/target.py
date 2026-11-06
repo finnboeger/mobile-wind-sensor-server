@@ -5,7 +5,7 @@ settings. Rebuilt whenever the settings change.
 
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from src.config import UplinkConfig
 from src.race_finder import RaceFinder
@@ -46,6 +46,29 @@ class SapTarget:
         if self.finder:
             return self.finder.current_races()
         return None
+
+    def refresh_races(self) -> None:
+        """Keep the race lookup fresh for the status, also while no data arrives."""
+        if self.finder and not self.problem:
+            try:
+                self.finder.current_races()
+            except Exception as e:
+                logger.debug(f"Could not look up the current races: {e}")
+
+    def last_current_races(self) -> List[Dict[str, str]]:
+        """The current races as last looked up, without asking SAP."""
+        if self.problem:
+            return []
+        if self.config.races:
+            return self.config.races
+        return (self.finder.last_races or []) if self.finder else []
+
+    def tracked_races(self) -> List[Dict[str, Any]]:
+        if self.problem:
+            return []
+        if self.config.races:
+            return [{**race, "finished": False} for race in self.config.races]
+        return self.finder.tracked if self.finder else []
 
     def backfill_races(self, race: Optional[Dict[str, str]] = None) -> Optional[List[Dict[str, str]]]:
         """

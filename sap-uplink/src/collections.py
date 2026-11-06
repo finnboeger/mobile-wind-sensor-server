@@ -15,6 +15,10 @@ def text(name: str) -> Dict[str, Any]:
     return {"name": name, "type": "text"}
 
 
+def field(name: str, type_: str) -> Dict[str, Any]:
+    return {"name": name, "type": type_}
+
+
 def autodate(name: str, on_update: bool) -> Dict[str, Any]:
     return {"name": name, "type": "autodate", "onCreate": True, "onUpdate": on_update}
 
@@ -25,6 +29,31 @@ COLLECTIONS: List[Dict[str, Any]] = [
         "name": "sap_settings",
         "fields": [text("sap_url"), text("access_token"), text("event_id"), text("course_area"), autodate("updated", True)],
         "public_read": False,
+    },
+    {
+        # One record, overwritten every few seconds
+        "name": "sap_uplink_status",
+        "fields": [
+            field("started_at", "date"),
+            field("heartbeat_at", "date"),
+            field("configured", "bool"),
+            text("problem"),
+            text("sap_url"),
+            text("event_id"),
+            text("course_area"),
+            text("realtime"),
+            text("cursor"),
+            field("last_sent_at", "date"),
+            field("last_accepted_at", "date"),
+            field("last_error_at", "date"),
+            text("last_error"),
+            field("current_races", "json"),
+            # No race list: SAP adds the wind to every tracked race the login may update
+            field("all_races", "bool"),
+            field("tracked_races", "json"),
+            field("stats", "json"),
+        ],
+        "public_read": True,
     },
 ]
 

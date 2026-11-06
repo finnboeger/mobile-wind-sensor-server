@@ -59,6 +59,15 @@ def select_races(
     return races
 
 
+def tracked_races(race_states: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    tracked: List[Dict[str, Any]] = []
+    for race_state in race_states:
+        race = race_identifier(race_state)
+        if race is not None and not any(t["regattaName"] == race["regattaName"] and t["raceName"] == race["raceName"] for t in tracked):
+            tracked.append({**race, "finished": is_finished(race_state)})
+    return tracked
+
+
 class RaceFinder:
     def __init__(
         self,
@@ -72,6 +81,8 @@ class RaceFinder:
         self.course_area = course_area
         self.refresh_seconds = refresh_seconds
         self._races: Optional[List[Dict[str, str]]] = None
+        # Every tracked race of the last lookup, with "finished", for the status
+        self.tracked: List[Dict[str, Any]] = []
         # (regattaName, raceName) -> when the race was first seen finished (monotonic)
         self._finished_since: Dict[Tuple[str, str], float] = {}
         self._fetched_at = 0.0
@@ -104,11 +115,16 @@ class RaceFinder:
             return self._races
 
         races = select_races(states, self._recently_finished(states))
+        self.tracked = tracked_races(states)
         if races != self._races:
             logger.info(f"Current races: {self._describe(races)}")
         self._races = races
         self._fetched_at = time.monotonic()
         return races
+
+    @property
+    def last_races(self) -> Optional[List[Dict[str, str]]]:
+        return self._races
 
     def all_tracked_races(self) -> List[Dict[str, str]]:
         """Every tracked race of the event/course area, finished or not (for backfill)."""

@@ -62,6 +62,12 @@ The environment's token is only used for the environment's server, and its
 course area only for its event: a server set in PocketBase needs its own
 token there.
 
+The uplink also writes its status to `sap_uplink_status` (one record, publicly
+readable, also created at startup) every 5 seconds, also while it waits for
+SAP: heartbeat, settings problem, SAP server and
+race selection, realtime connection, cursor, when SAP last answered and last
+accepted fixes, the last error, the current and tracked races, and counters.
+
 ### Conversion
 
 | putWind field | from measurement |
