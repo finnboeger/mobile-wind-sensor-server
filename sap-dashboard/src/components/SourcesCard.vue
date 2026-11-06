@@ -1,7 +1,7 @@
 <template>
   <div class="card">
     <h2><span :class="['dot', level]"></span>Wind data in PocketBase</h2>
-    <p v-if="sources.length === 0" class="muted">No measurements yet.</p>
+    <p v-if="sources.length === 0" class="muted">No measurements in the last 24 hours.</p>
     <table v-else>
       <thead>
         <tr><th>Source</th><th>Latest fix</th><th>Arrived after</th><th>Latest sendable</th></tr>

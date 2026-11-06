@@ -5,7 +5,8 @@ import SourcesCard from "./components/SourcesCard.vue";
 import UplinkCard from "./components/UplinkCard.vue";
 import { ageClass, ms } from "./format";
 import { STATUS_ID, connect, isNotFound, message } from "./pocketbase";
-import type { Measurement, UplinkStatus } from "./types";
+import { findSources, loadSources, type SourceHealth } from "./sources";
+import type { UplinkStatus } from "./types";
 
 export default defineComponent({
   components: { SapCard, SourcesCard, UplinkCard },
@@ -13,7 +14,7 @@ export default defineComponent({
     const pb = shallowRef<PocketBase | null>(null);
     const loadError = ref("");
     const status = ref<UplinkStatus | null>(null);
-    const recent = ref<Measurement[]>([]);
+    const sources = ref<SourceHealth[]>([]);
 
     const uplinkAlive = computed(() => ageClass(ms(status.value?.heartbeat_at), 60, 120) !== "bad");
 
@@ -32,15 +33,16 @@ export default defineComponent({
       }
     }
 
+    // Looked up again every few minutes, for sensors added meanwhile
+    let sourceIds: string[] = [];
+    let sourcesFoundAt = 0;
+
     async function loadMeasurements() {
-      // The newest records cover every source that sent something lately
-      const page = await pb.value!.collection("measurements").getList<Measurement>(1, 200, {
-        sort: "-created_at",
-        fields: "source_id,ts,created_at,gps_lat,gps_lng,true_wind_dir_deg,true_wind_speed_mps",
-        skipTotal: true,
-        requestKey: null,
-      });
-      recent.value = page.items;
+      if (Date.now() - sourcesFoundAt > 300_000) {
+        sourceIds = await findSources(pb.value!);
+        sourcesFoundAt = Date.now();
+      }
+      sources.value = await loadSources(pb.value!, sourceIds, Date.now());
     }
 
     async function loadAll() {
@@ -76,6 +78,6 @@ export default defineComponent({
       pb.value?.realtime.unsubscribe();
     });
 
-    return { loadError, status, recent, uplinkAlive, currentKeys };
+    return { loadError, status, sources, uplinkAlive, currentKeys };
   },
 });

@@ -8,7 +8,8 @@ SAP uplink's own collections (see `sap-uplink/README.md`).
 
 - **Wind data in PocketBase**, per source: age of the latest measurement, how
   long it took to arrive, and age of the latest one SAP could take (position
-  and true wind).
+  and true wind). Read per source, so a sensor that stopped sending stays
+  listed with its age; sources quiet for over 24 hours are left out.
 - **Uplink service**: heartbeat, settings problem, SAP server, race selection,
   realtime connection, and how far it has forwarded.
 - **SAP**: when it last accepted fixes and last answered, the last error, and a
