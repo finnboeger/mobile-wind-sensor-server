@@ -19,24 +19,17 @@ def load(**env):
 
 
 class ConfigTest(unittest.TestCase):
-    def test_requires_races_or_explicit_all_races(self):
-        # SAP would otherwise add the wind to every race the login may update
-        with self.assertRaises(ValueError):
-            load()
-        self.assertTrue(load(SAP_ALL_RACES="true").all_races)
-
-    def test_event_mode(self):
+    def test_sap_settings_are_optional_defaults(self):
+        # They can be set in the dashboard instead
+        config = load(SAP_URL="", SAP_BEARER_TOKEN="")
+        self.assertEqual(config.defaults.problem(), "No SAP server set")
         config = load(SAP_EVENT_ID="e74bea92", SAP_COURSE_AREA="Default")
-        self.assertEqual((config.event_id, config.course_area, config.races), ("e74bea92", "Default", None))
-
-    def test_course_area_needs_event(self):
-        with self.assertRaises(ValueError):
-            load(SAP_COURSE_AREA="Default")
+        self.assertEqual((config.defaults.event_id, config.defaults.course_area, config.races), ("e74bea92", "Default", None))
 
     def test_parses_races(self):
         config = load(SAP_RACES='[{"regattaName":"Windbot Test","raceName":"Windbot Test R1 Default"}]')
         self.assertEqual(config.races, [{"regattaName": "Windbot Test", "raceName": "Windbot Test R1 Default"}])
-        self.assertEqual(config.sap_url, "https://dev.sapsailing.com")
+        self.assertEqual(config.defaults.sap_url, "https://dev.sapsailing.com")
 
     def test_parses_excluded_sources(self):
         self.assertEqual(load(SAP_ALL_RACES="true").exclude_sources, set())

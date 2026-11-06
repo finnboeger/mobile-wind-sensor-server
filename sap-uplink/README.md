@@ -45,6 +45,18 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
 - If SAP answers `400`, that batch is logged and skipped so it can't block the
   uplink. Any other error is retried with backoff.
 
+## Settings in PocketBase
+
+The SAP server, access token, event id and course area can also be set in
+the `sap_settings` collection (one record, superusers only, created by the
+uplink at startup). Its values win over `SAP_URL`, `SAP_BEARER_TOKEN`,
+`SAP_EVENT_ID` and `SAP_COURSE_AREA`; empty fields fall back to those. They
+are read at startup.
+
+The environment's token is only used for the environment's server, and its
+course area only for its event: a server set in PocketBase needs its own
+token there.
+
 ### Conversion
 
 | putWind field | from measurement |
@@ -59,6 +71,9 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
 All configuration via environment variables:
 
 ```bash
+# SAP_URL, SAP_BEARER_TOKEN, SAP_EVENT_ID and SAP_COURSE_AREA can also be set in
+# PocketBase, which wins (see "Settings in PocketBase")
+
 # SAP Sailing server: the event's server, without the /sailingserver path
 SAP_URL=https://my-event.sapsailing.com
 

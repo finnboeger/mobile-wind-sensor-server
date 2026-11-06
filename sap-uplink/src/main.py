@@ -6,6 +6,7 @@ Docker service that:
 - Picks up new true wind data from PocketBase (realtime subscription, polling as fallback)
 - Forwards it to SAP Sailing Analytics via the putWind API
 - Keeps a cursor so outages on either side lose no data
+- Takes its SAP settings from PocketBase
 
 Usage:
   python -m src.main                              # run continuously
@@ -27,6 +28,7 @@ from src.pocketbase_reader import PocketbaseReader
 from src.pocketbase_store import PocketbaseStore
 from src.race_finder import RaceFinder
 from src.realtime import RealtimeListener
+from src.settings import SettingsSource
 from src.sap_client import SapClient, SapError, SapRejectedError
 from src.uplink import CursorStore, Uplink
 
@@ -85,7 +87,7 @@ def main():
             # A wrong setting, not a bug: one line instead of a traceback
             logger.error(f"Invalid configuration: {e}")
             sys.exit(1)
-        logger.info(f"Configuration loaded: {config.sap_url}")
+        logger.info("Configuration loaded")
 
         if config.log_level in LOG_LEVELS:
             logging.getLogger().setLevel(LOG_LEVELS[config.log_level])
@@ -100,19 +102,26 @@ def main():
             config.request_timeout_seconds,
         )
         ensure_collections(store)
+        settings = SettingsSource(store, config.defaults).get()
+        problem = settings.problem()
+        if not problem and not (config.races or settings.event_id or config.all_races):
+            problem = "No event set (or SAP_RACES / SAP_ALL_RACES)"
+        if problem:
+            logger.error(f"Invalid configuration: {problem}")
+            sys.exit(1)
         sap = SapClient(
-            config.sap_url,
-            bearer_token=config.sap_bearer_token,
+            settings.sap_url,
+            bearer_token=settings.access_token,
             timeout_seconds=config.request_timeout_seconds,
         )
         finder = None
         if config.races:
             races_provider = lambda: config.races
-        elif config.event_id:
+        elif settings.event_id:
             finder = RaceFinder(
                 sap,
-                config.event_id,
-                config.course_area,
+                settings.event_id,
+                settings.course_area or None,
                 refresh_seconds=config.race_refresh_seconds,
             )
             try:
@@ -122,7 +131,7 @@ def main():
                 sys.exit(1)
             except SapError as e:
                 # SAP unreachable right now: the uplink keeps retrying the lookup
-                logger.warning(f"Could not check SAP_EVENT_ID yet: {e}")
+                logger.warning(f"Could not check event {settings.event_id} yet: {e}")
             races_provider = finder.current_races
         else:
             races_provider = lambda: None
@@ -139,8 +148,8 @@ def main():
             races = ", ".join(f"{r['regattaName']} / {r['raceName']}" for r in config.races)
             logger.info(f"Races: {races}")
         elif finder:
-            area = f"course area '{config.course_area}'" if config.course_area else "all course areas"
-            logger.info(f"Races: current races of event {config.event_id}, {area}")
+            area = f"course area '{settings.course_area}'" if settings.course_area else "all course areas"
+            logger.info(f"Races: current races of event {settings.event_id}, {area}")
         else:
             logger.warning("Races: every tracked race this login may update (SAP_ALL_RACES=true)")
 
