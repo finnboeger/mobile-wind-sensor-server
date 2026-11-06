@@ -24,3 +24,13 @@ export interface UplinkStatus {
   tracked_races?: Race[];
   stats?: Record<string, number>;
 }
+
+export interface Measurement {
+  source_id: string;
+  ts: string;
+  created_at: string;
+  gps_lat?: number;
+  gps_lng?: number;
+  true_wind_dir_deg?: number | null;
+  true_wind_speed_mps?: number | null;
+}

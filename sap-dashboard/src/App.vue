@@ -7,6 +7,7 @@
     <div v-if="loadError" class="banner error">{{ loadError }}</div>
 
     <section class="cards">
+      <SourcesCard :sources="sources" />
       <UplinkCard :status="status" :alive="uplinkAlive" />
       <SapCard :status="status" :has-current-race="currentKeys.size > 0" />
     </section>
