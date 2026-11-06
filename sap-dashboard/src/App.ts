@@ -1,5 +1,6 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import type PocketBase from "pocketbase";
+import AdminDialog from "./components/AdminDialog.vue";
 import BackfillList from "./components/BackfillList.vue";
 import RacesTable from "./components/RacesTable.vue";
 import SapCard from "./components/SapCard.vue";
@@ -12,7 +13,7 @@ import { findSources, loadSources, type SourceHealth } from "./sources";
 import type { Backfill, RaceUpload, UplinkStatus } from "./types";
 
 export default defineComponent({
-  components: { BackfillList, RacesTable, SapCard, SourcesCard, UplinkCard },
+  components: { AdminDialog, BackfillList, RacesTable, SapCard, SourcesCard, UplinkCard },
   setup() {
     const pb = shallowRef<PocketBase | null>(null);
     const loadError = ref("");
@@ -20,6 +21,7 @@ export default defineComponent({
     const uploads = ref<RaceUpload[]>([]);
     const backfills = ref<Backfill[]>([]);
     const sources = ref<SourceHealth[]>([]);
+    const dialog = ref<"settings" | null>(null);
 
     const uplinkAlive = computed(() => ageClass(ms(status.value?.heartbeat_at), 60, 120) !== "bad");
 
@@ -104,6 +106,6 @@ export default defineComponent({
       pb.value?.realtime.unsubscribe();
     });
 
-    return { loadError, status, backfills, sources, uplinkAlive, currentKeys, races };
+    return { pb, loadError, status, backfills, sources, dialog, uplinkAlive, currentKeys, races };
   },
 });
