@@ -21,8 +21,10 @@ import signal
 import sys
 from datetime import datetime, timezone
 
+from src.collections import ensure_collections
 from src.config import UplinkConfig, parse_timestamp
 from src.pocketbase_reader import PocketbaseReader
+from src.pocketbase_store import PocketbaseStore
 from src.race_finder import RaceFinder
 from src.realtime import RealtimeListener
 from src.sap_client import SapClient, SapError, SapRejectedError
@@ -91,6 +93,13 @@ def main():
             logger.warning(f"Unknown LOG_LEVEL '{config.log_level}', using info ({', '.join(LOG_LEVELS)})")
 
         reader = PocketbaseReader(config.pocketbase_url, config.request_timeout_seconds)
+        store = PocketbaseStore(
+            config.pocketbase_url,
+            config.pocketbase_email,
+            config.pocketbase_password,
+            config.request_timeout_seconds,
+        )
+        ensure_collections(store)
         sap = SapClient(
             config.sap_url,
             bearer_token=config.sap_bearer_token,
