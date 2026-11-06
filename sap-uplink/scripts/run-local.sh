@@ -5,6 +5,8 @@ set -euo pipefail
 # SAP_URL, SAP_BEARER_TOKEN and SAP_RACES (or SAP_ALL_RACES) must be set by the caller.
 
 export POCKETBASE_URL="${POCKETBASE_URL:-http://localhost:8090}"
+export POCKETBASE_ADMIN_EMAIL="${POCKETBASE_ADMIN_EMAIL:-admin@example.com}"
+export POCKETBASE_ADMIN_PASSWORD="${POCKETBASE_ADMIN_PASSWORD:-adminadmin}"
 
 export LOG_LEVEL="${LOG_LEVEL:-info}"
 

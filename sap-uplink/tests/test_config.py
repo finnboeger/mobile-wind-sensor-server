@@ -8,6 +8,8 @@ BASE_ENV = {
     "SAP_URL": "https://dev.sapsailing.com/",
     "SAP_BEARER_TOKEN": "token",
     "POCKETBASE_URL": "http://pocketbase:8090",
+    "POCKETBASE_ADMIN_EMAIL": "admin@example.com",
+    "POCKETBASE_ADMIN_PASSWORD": "secret",
 }
 
 
