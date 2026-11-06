@@ -1,12 +1,14 @@
 import os
 import tempfile
 import unittest
+import unittest.mock
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from src.convert import format_pocketbase_ts
 from src.sap_client import SapError, SapRejectedError
 from src.settings import SapSettings
+from src.status import RaceUploads
 from src.target import SapTarget
 from src.uplink import CursorStore, Uplink
 
@@ -246,6 +248,17 @@ class UplinkTest(unittest.TestCase):
         self.assertEqual(clients, [("https://a.sapsailing.com", "t1"), ("https://b.sapsailing.com", "t2")])
         self.assertEqual(self.sap.timepoints, [timepoint(1), timepoint(2)])
         self.assertTrue(uplink.status.fields["configured"])
+
+    def test_reports_accepted_range_per_race(self):
+        self.reader.records = [measurement(s) for s in (1, 2, 3)]
+        uploads = RaceUploads(None)
+        uplink = self.make_uplink()
+        uplink.uploads = uploads
+        uplink.forward_new()
+        self.assertEqual(
+            uploads._pending[("R", "1", "sensor_1")],
+            {"first_ms": timepoint(1), "last_ms": timepoint(3), "count": 3, "accepted_at": unittest.mock.ANY},
+        )
 
 
 if __name__ == "__main__":

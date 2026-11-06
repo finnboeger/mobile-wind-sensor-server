@@ -6,7 +6,8 @@ Docker service that:
 - Picks up new true wind data from PocketBase (realtime subscription, polling as fallback)
 - Forwards it to SAP Sailing Analytics via the putWind API
 - Keeps a cursor so outages on either side lose no data
-- Takes its SAP settings from PocketBase and reports its status there
+- Takes its SAP settings from PocketBase and reports its status and the
+  races that accepted wind there
 
 Usage:
   python -m src.main                              # run continuously
@@ -28,7 +29,7 @@ from src.pocketbase_reader import PocketbaseReader
 from src.pocketbase_store import PocketbaseStore
 from src.realtime import RealtimeListener
 from src.settings import SettingsSource
-from src.status import UplinkStatus
+from src.status import RaceUploads, UplinkStatus
 from src.target import SapTarget
 from src.uplink import CursorStore, Uplink
 
@@ -112,15 +113,18 @@ def main():
         else:
             logger.info("Sources: all")
 
+        uploads = RaceUploads(store)
+
         if args.backfill:
             problem = target.refresh()
             if problem:
                 logger.error(f"Invalid configuration: {problem}")
                 sys.exit(1)
-            uplink = Uplink(config, reader, target.sap, store=None)
+            uplink = Uplink(config, reader, target.sap, store=None, uploads=uploads)
             # The races running back then may be finished by now: offer every tracked
             # race, SAP only keeps the fixes inside each race's tracking interval
             uplink.backfill(args.start, args.end, target.backfill_races())
+            uploads.flush(force=True)
             logger.info(f"✓ Backfill done: {uplink.stats}")
             return
 
@@ -149,7 +153,7 @@ def main():
             }
 
         status = UplinkStatus(store, extra=live_status)
-        uplink = Uplink(config, reader, None, CursorStore(config.state_file), target=target, status=status)
+        uplink = Uplink(config, reader, None, CursorStore(config.state_file), target=target, status=status, uploads=uploads)
         uplink.init_cursor()
         if listener:
             listener.start()
