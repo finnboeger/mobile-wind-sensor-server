@@ -17,7 +17,7 @@
     <BackfillList :backfills="backfills" />
 
     <AdminDialog v-if="pb && dialog === 'settings'" :pb="pb" title="SAP settings" @close="dialog = null">
-      <p class="muted">Logged in.</p>
+      <SettingsForm :pb="pb" @saved="dialog = null" />
     </AdminDialog>
   </div>
 </template>

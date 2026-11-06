@@ -4,6 +4,7 @@ import AdminDialog from "./components/AdminDialog.vue";
 import BackfillList from "./components/BackfillList.vue";
 import RacesTable from "./components/RacesTable.vue";
 import SapCard from "./components/SapCard.vue";
+import SettingsForm from "./components/SettingsForm.vue";
 import SourcesCard from "./components/SourcesCard.vue";
 import UplinkCard from "./components/UplinkCard.vue";
 import { ageClass, ms, now } from "./format";
@@ -13,7 +14,7 @@ import { findSources, loadSources, type SourceHealth } from "./sources";
 import type { Backfill, RaceUpload, UplinkStatus } from "./types";
 
 export default defineComponent({
-  components: { AdminDialog, BackfillList, RacesTable, SapCard, SourcesCard, UplinkCard },
+  components: { AdminDialog, BackfillList, RacesTable, SapCard, SettingsForm, SourcesCard, UplinkCard },
   setup() {
     const pb = shallowRef<PocketBase | null>(null);
     const loadError = ref("");

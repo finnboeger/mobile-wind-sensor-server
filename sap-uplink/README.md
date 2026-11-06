@@ -48,10 +48,10 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
 ## Settings in PocketBase
 
 The SAP server, access token, event id and course area can be changed while
-the service runs, in the `sap_settings` collection (one record, superusers
-only, created by the uplink at startup). Its values win over
-`SAP_URL`, `SAP_BEARER_TOKEN`, `SAP_EVENT_ID` and `SAP_COURSE_AREA`; empty
-fields fall back to those. The uplink re-reads them every 10 seconds, so no
+the service runs, on the sap-dashboard page (⚙). It stores them in the
+`sap_settings` collection (one record, superusers only, created by the uplink
+at startup), whose values win over `SAP_URL`, `SAP_BEARER_TOKEN`,
+`SAP_EVENT_ID` and `SAP_COURSE_AREA`; empty fields fall back to those. The uplink re-reads them every 10 seconds, so no
 restart is needed. Until it has a server, a token and races to send to, it
 waits and keeps its cursor.
 
@@ -86,8 +86,8 @@ It only covers fixes sent since it was added.
 All configuration via environment variables:
 
 ```bash
-# SAP_URL, SAP_BEARER_TOKEN, SAP_EVENT_ID and SAP_COURSE_AREA can also be set in
-# PocketBase, which wins (see "Settings in PocketBase")
+# SAP_URL, SAP_BEARER_TOKEN, SAP_EVENT_ID and SAP_COURSE_AREA can also be set on
+# the sap-dashboard page, which wins (see "Settings in PocketBase")
 
 # SAP Sailing server: the event's server, without the /sailingserver path
 SAP_URL=https://my-event.sapsailing.com

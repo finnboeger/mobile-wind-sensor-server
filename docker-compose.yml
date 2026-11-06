@@ -135,7 +135,7 @@ services:
     profiles: ["sap"]
     environment:
       # SAP Sailing configuration (empty values use the defaults in sap-uplink/src/config.py).
-      # Server, token, event and course area can also be set in PocketBase (sap_settings), which wins.
+      # Server, token, event and course area can also be set on the sap-dashboard page, which wins.
       SAP_URL: ${SAP_URL:-}
       SAP_BEARER_TOKEN: ${SAP_BEARER_TOKEN:-}
       SAP_EXCLUDE_SOURCES: ${SAP_EXCLUDE_SOURCES:-}

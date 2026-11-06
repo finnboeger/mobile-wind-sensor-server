@@ -2,6 +2,7 @@ import PocketBase from "pocketbase";
 
 // Fixed record ids, shared with sap-uplink/src/pocketbase_store.py
 export const STATUS_ID = "sapuplinkstatus";
+export const SETTINGS_ID = "sapuplinkconfig";
 
 export async function connect(): Promise<PocketBase> {
   // Written by the container's entrypoint from POCKETBASE_PUBLIC_URL
