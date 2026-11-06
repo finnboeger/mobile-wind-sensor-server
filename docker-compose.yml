@@ -171,6 +171,25 @@ services:
       - wind-network
     restart: unless-stopped
 
+  # SAP forwarding health page: a static page that reads the uplink's records
+  # from PocketBase in the browser
+  sap-dashboard:
+    build:
+      context: ./sap-dashboard
+      dockerfile: Dockerfile
+    container_name: wind-sap-dashboard
+    profiles: ["sap"]
+    ports:
+      - "${SAP_DASHBOARD_PORT:-3001}:80"
+    environment:
+      # PocketBase as the browser reaches it
+      POCKETBASE_PUBLIC_URL: ${POCKETBASE_PUBLIC_URL:-http://localhost:8090}
+      # Path prefix, when a proxy routes e.g. /sap here without stripping it
+      BASE_PATH: ${SAP_DASHBOARD_BASE_PATH:-}
+    networks:
+      - wind-network
+    restart: unless-stopped
+
 networks:
   wind-network:
     driver: bridge
