@@ -1,6 +1,7 @@
 import { computed, defineComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import type PocketBase from "pocketbase";
 import AdminDialog from "./components/AdminDialog.vue";
+import BackfillForm from "./components/BackfillForm.vue";
 import BackfillList from "./components/BackfillList.vue";
 import RacesTable from "./components/RacesTable.vue";
 import SapCard from "./components/SapCard.vue";
@@ -9,12 +10,12 @@ import SourcesCard from "./components/SourcesCard.vue";
 import UplinkCard from "./components/UplinkCard.vue";
 import { ageClass, ms, now } from "./format";
 import { STATUS_ID, connect, isNotFound, message } from "./pocketbase";
-import { buildRaces, raceKey } from "./races";
+import { buildRaces, raceKey, type RaceRow } from "./races";
 import { findSources, loadSources, type SourceHealth } from "./sources";
 import type { Backfill, RaceUpload, UplinkStatus } from "./types";
 
 export default defineComponent({
-  components: { AdminDialog, BackfillList, RacesTable, SapCard, SettingsForm, SourcesCard, UplinkCard },
+  components: { AdminDialog, BackfillForm, BackfillList, RacesTable, SapCard, SettingsForm, SourcesCard, UplinkCard },
   setup() {
     const pb = shallowRef<PocketBase | null>(null);
     const loadError = ref("");
@@ -22,7 +23,8 @@ export default defineComponent({
     const uploads = ref<RaceUpload[]>([]);
     const backfills = ref<Backfill[]>([]);
     const sources = ref<SourceHealth[]>([]);
-    const dialog = ref<"settings" | null>(null);
+    const dialog = ref<"settings" | "backfill" | null>(null);
+    const backfillRace = ref<RaceRow | null>(null);
 
     const uplinkAlive = computed(() => ageClass(ms(status.value?.heartbeat_at), 60, 120) !== "bad");
 
@@ -33,6 +35,11 @@ export default defineComponent({
     });
 
     const races = computed(() => buildRaces(status.value, uploads.value, currentKeys.value, now.value));
+
+    function openBackfill(race: RaceRow | null) {
+      backfillRace.value = race;
+      dialog.value = "backfill";
+    }
 
     async function loadStatus() {
       try {
@@ -107,6 +114,6 @@ export default defineComponent({
       pb.value?.realtime.unsubscribe();
     });
 
-    return { pb, loadError, status, backfills, sources, dialog, uplinkAlive, currentKeys, races };
+    return { pb, loadError, status, backfills, sources, dialog, backfillRace, uplinkAlive, currentKeys, races, openBackfill, loadBackfills };
   },
 });

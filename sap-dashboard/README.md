@@ -29,6 +29,15 @@ which wins over its `SAP_URL`, `SAP_BEARER_TOKEN`, `SAP_EVENT_ID` and
 `SAP_COURSE_AREA`; empty fields fall back to those. The uplink picks them up
 within about 10 seconds.
 
+## Backfill
+
+Backfill… (per race, or for every tracked race of the event) asks the uplink to
+send a time range again, after logging in. The range is prefilled with the
+days of the race's accepted fixes, and the form shows how many measurements it
+holds. SAP only keeps fixes inside a race's tracking interval and ignores
+fixes it already has, so a generous range is fine. The request goes to
+`sap_backfills`; the uplink runs it next to live forwarding.
+
 ## Running
 
 With Docker it runs behind the `sap` compose profile, next to the uplink, on

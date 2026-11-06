@@ -13,11 +13,14 @@
       <SapCard :status="status" :has-current-race="currentKeys.size > 0" />
     </section>
 
-    <RacesTable :races="races" />
+    <RacesTable :races="races" backfill @backfill="openBackfill" />
     <BackfillList :backfills="backfills" />
 
     <AdminDialog v-if="pb && dialog === 'settings'" :pb="pb" title="SAP settings" @close="dialog = null">
       <SettingsForm :pb="pb" @saved="dialog = null" />
+    </AdminDialog>
+    <AdminDialog v-if="pb && dialog === 'backfill'" :pb="pb" title="Backfill" @close="dialog = null">
+      <BackfillForm :pb="pb" :races="races" :race="backfillRace" @requested="dialog = null; loadBackfills()" />
     </AdminDialog>
   </div>
 </template>

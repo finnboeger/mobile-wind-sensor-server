@@ -17,3 +17,8 @@ export function isNotFound(e: unknown): boolean {
 export function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
+
+// PocketBase stores and filters dates as "YYYY-MM-DD HH:MM:SS.sssZ"
+export function pbDate(t: number): string {
+  return new Date(t).toISOString().replace("T", " ");
+}
