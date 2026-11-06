@@ -183,6 +183,15 @@ To stop uploading after an event, remove `sap` from `COMPOSE_PROFILES` and run
 
 ### Backfill
 
+A backfill can also be requested by adding a record to `sap_backfills`
+(`regatta_name` and `race_name`, or both empty for every tracked race of the
+event; `range_from`, `range_until`; `status` = `pending`). The uplink runs
+pending ones one at a time on a thread of its own, next to live forwarding,
+and writes progress, counts and the outcome back to the record. Backfills
+interrupted by a restart run again.
+
+On the command line:
+
 The running service only sends what reaches PocketBase after its cursor, and
 drops fixes while no race is current. Backfill sends the measurements of a
 time range once and exits, without touching the cursor. Use it when:

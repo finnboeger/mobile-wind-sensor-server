@@ -74,6 +74,24 @@ COLLECTIONS: List[Dict[str, Any]] = [
         ],
         "public_read": True,
     },
+    {
+        # Requested backfills; the uplink runs pending ones in order
+        "name": "sap_backfills",
+        "fields": [
+            text("regatta_name"),
+            text("race_name"),
+            {"name": "range_from", "type": "date", "required": True},
+            {"name": "range_until", "type": "date", "required": True},
+            {"name": "status", "type": "select", "required": True, "maxSelect": 1, "values": ["pending", "running", "done", "failed"]},
+            text("message"),
+            field("fixes_sent", "number"),
+            field("fixes_accepted", "number"),
+            field("started_at", "date"),
+            field("finished_at", "date"),
+            autodate("created", False),
+        ],
+        "public_read": True,
+    },
 ]
 
 

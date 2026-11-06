@@ -6,8 +6,8 @@ Docker service that:
 - Picks up new true wind data from PocketBase (realtime subscription, polling as fallback)
 - Forwards it to SAP Sailing Analytics via the putWind API
 - Keeps a cursor so outages on either side lose no data
-- Takes its SAP settings from PocketBase and reports its status and the
-  races that accepted wind there
+- Takes its SAP settings and backfill requests from PocketBase and reports
+  its status and the races that accepted wind there
 
 Usage:
   python -m src.main                              # run continuously
@@ -23,6 +23,7 @@ import signal
 import sys
 from datetime import datetime, timezone
 
+from src.backfill_jobs import BackfillWorker
 from src.collections import ensure_collections
 from src.config import UplinkConfig, parse_timestamp
 from src.pocketbase_reader import PocketbaseReader
@@ -123,7 +124,7 @@ def main():
             uplink = Uplink(config, reader, target.sap, store=None, uploads=uploads)
             # The races running back then may be finished by now: offer every tracked
             # race, SAP only keeps the fixes inside each race's tracking interval
-            uplink.backfill(args.start, args.end, target.backfill_races())
+            uplink.backfill(args.start, args.end, target.backfill_races(), on_page=uploads.flush)
             uploads.flush(force=True)
             logger.info(f"✓ Backfill done: {uplink.stats}")
             return
@@ -158,6 +159,7 @@ def main():
         if listener:
             listener.start()
         status.start()
+        BackfillWorker(config, store, uploads).start()
         logger.info(
             f"✓ SAP Sailing Uplink Service started successfully "
             f"(realtime {'on' if config.realtime else 'off'}, polling every {config.poll_seconds:g}s)"
