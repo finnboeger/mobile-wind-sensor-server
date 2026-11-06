@@ -35,6 +35,19 @@ export interface RaceUpload {
   last_accepted_at: string;
 }
 
+export interface Backfill {
+  id: string;
+  regatta_name: string;
+  race_name: string;
+  range_from: string;
+  range_until: string;
+  status: string;
+  message: string;
+  fixes_sent: number;
+  fixes_accepted: number;
+  created: string;
+}
+
 export interface Measurement {
   source_id: string;
   ts: string;

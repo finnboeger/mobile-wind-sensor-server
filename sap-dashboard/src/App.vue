@@ -13,6 +13,7 @@
     </section>
 
     <RacesTable :races="races" />
+    <BackfillList :backfills="backfills" />
   </div>
 </template>
 

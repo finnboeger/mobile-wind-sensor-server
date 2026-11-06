@@ -19,6 +19,7 @@ SAP uplink's own collections (see `sap-uplink/README.md`).
 - **Races**: every race that accepted wind or is tracked in the event, current
   races first, then by last accepted fix, with the first and last accepted fix
   and the sources.
+- **Backfills** and how they went.
 
 ## Running
 
