@@ -47,11 +47,16 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
 
 ## Settings in PocketBase
 
-The SAP server, access token, event id and course area can also be set in
-the `sap_settings` collection (one record, superusers only, created by the
-uplink at startup). Its values win over `SAP_URL`, `SAP_BEARER_TOKEN`,
-`SAP_EVENT_ID` and `SAP_COURSE_AREA`; empty fields fall back to those. They
-are read at startup.
+The SAP server, access token, event id and course area can be changed while
+the service runs, in the `sap_settings` collection (one record, superusers
+only, created by the uplink at startup). Its values win over
+`SAP_URL`, `SAP_BEARER_TOKEN`, `SAP_EVENT_ID` and `SAP_COURSE_AREA`; empty
+fields fall back to those. The uplink re-reads them every 10 seconds, so no
+restart is needed. Until it has a server, a token and races to send to, it
+waits and keeps its cursor.
+
+The uplink logs in to PocketBase as a superuser to create and read them
+(`POCKETBASE_ADMIN_EMAIL` / `POCKETBASE_ADMIN_PASSWORD`).
 
 The environment's token is only used for the environment's server, and its
 course area only for its event: a server set in PocketBase needs its own
@@ -107,7 +112,7 @@ SAP_RACE_REFRESH_SECONDS=30       # how often the current races are looked up (a
 SAP_STATE_FILE=/data/cursor.json
 
 POCKETBASE_URL=http://pocketbase:8090
-POCKETBASE_ADMIN_EMAIL=           # superuser, for the uplink's own collections
+POCKETBASE_ADMIN_EMAIL=           # superuser, for the settings in PocketBase
 POCKETBASE_ADMIN_PASSWORD=
 LOG_LEVEL=info  # debug, info, warning, error
 ```

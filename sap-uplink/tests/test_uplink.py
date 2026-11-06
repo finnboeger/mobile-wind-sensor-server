@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 from src.convert import format_pocketbase_ts
 from src.sap_client import SapError, SapRejectedError
+from src.settings import SapSettings
+from src.target import SapTarget
 from src.uplink import CursorStore, Uplink
 
 T0 = datetime(2026, 10, 28, 12, 0, 0, tzinfo=timezone.utc)
@@ -215,6 +217,33 @@ class UplinkTest(unittest.TestCase):
         uplink.forward_new()
         self.assertEqual(self.sap.calls, [])
         self.assertEqual(uplink.cursor, ts(1))
+
+    def test_follows_settings_and_waits_while_unconfigured(self):
+        self.reader.records = [measurement(1)]
+        settings = SimpleNamespace(value=SapSettings())
+        clients = []
+
+        def client(url, bearer_token, timeout_seconds):
+            clients.append((url, bearer_token))
+            return self.sap
+
+        config = SimpleNamespace(races=[{"regattaName": "R", "raceName": "1"}], all_races=False, request_timeout_seconds=1)
+        target = SapTarget(config, SimpleNamespace(get=lambda: settings.value), client_factory=client)
+        uplink = self.make_uplink()
+        uplink.target = target
+
+        self.assertFalse(uplink.poll_once())
+        self.assertEqual((self.sap.calls, uplink.cursor), ([], ts(0)))
+
+        settings.value = SapSettings(sap_url="https://a.sapsailing.com", access_token="t1")
+        uplink.retry_at = 0
+        uplink.poll_once()
+        self.reader.records.append(measurement(2))
+        settings.value = SapSettings(sap_url="https://b.sapsailing.com", access_token="t2")
+        uplink.poll_once()
+
+        self.assertEqual(clients, [("https://a.sapsailing.com", "t1"), ("https://b.sapsailing.com", "t2")])
+        self.assertEqual(self.sap.timepoints, [timepoint(1), timepoint(2)])
 
 
 if __name__ == "__main__":
