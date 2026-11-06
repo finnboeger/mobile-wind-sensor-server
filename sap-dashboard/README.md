@@ -16,6 +16,9 @@ SAP uplink's own collections (see `sap-uplink/README.md`).
   warning when SAP answers but no current race takes the fixes (usually a
   wrong or expired access token: SAP doesn't refuse it, it just adds the wind
   to no race).
+- **Races**: every race that accepted wind or is tracked in the event, current
+  races first, then by last accepted fix, with the first and last accepted fix
+  and the sources.
 
 ## Running
 

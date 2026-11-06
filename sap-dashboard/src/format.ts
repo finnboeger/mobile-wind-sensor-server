@@ -27,6 +27,13 @@ export function clock(t: number | null): string {
   return t === null ? "—" : new Date(t).toLocaleTimeString();
 }
 
+export function dateTime(t: number | null): string {
+  if (t === null) return "—";
+  const d = new Date(t);
+  const sameDay = d.toDateString() === new Date(now.value).toDateString();
+  return sameDay ? d.toLocaleTimeString() : d.toLocaleString();
+}
+
 // "ok" up to okSeconds old, "warn" up to warnSeconds, "bad" beyond or never
 export function ageClass(t: number | null, okSeconds: number, warnSeconds: number): string {
   if (t === null) return "bad";
