@@ -46,6 +46,16 @@ body {
 .muted { color: #777; }
 .small { font-size: 0.8rem; }
 
+dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  font-size: 0.9rem;
+}
+
+dt { color: #666; }
+dd { overflow-wrap: anywhere; }
+
 .banner {
   padding: 10px 14px;
   border-radius: 8px;

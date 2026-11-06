@@ -5,7 +5,11 @@
     </header>
 
     <div v-if="loadError" class="banner error">{{ loadError }}</div>
-    <pre v-else-if="status" class="small">{{ status }}</pre>
+
+    <section class="cards">
+      <UplinkCard :status="status" :alive="uplinkAlive" />
+      <SapCard :status="status" :has-current-race="currentKeys.size > 0" />
+    </section>
   </div>
 </template>
 
@@ -27,4 +31,10 @@ header {
 }
 
 h1 { font-size: 1.4rem; }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
 </style>
