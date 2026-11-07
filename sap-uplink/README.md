@@ -42,6 +42,19 @@ PUT {SAP_URL}/sailingserver/api/v1/wind/putWind
   fallback. Set `SAP_REALTIME=false` to only poll.
 - Measurements without a GPS position or true wind are skipped, because
   putWind requires both.
+- Measurements taken while the boat speeds up, slows down or turns are
+  dropped, the same way the onboard dashboard leaves them out. GPS speed and
+  course lag behind the boat during those moments, so the true wind is off
+  until the client fuses GPS with the IMU. Between two consecutive measurements
+  of a source, a speed change faster than `SAP_ACCEL_THRESHOLD_MS2` or a heading
+  change faster than `SAP_HEADING_RATE_THRESHOLD_DEGS` (above 1 m/s) marks an
+  event, and every measurement within `SAP_UNSTEADY_WINDOW_SECONDS` before or
+  after it is dropped. To judge a measurement the service needs the ones after
+  it, so live forwarding waits until a measurement of the same source at least
+  that window later has arrived, or at most `SAP_UNSTEADY_MAX_HOLD_SECONDS`.
+  Backfills drop them too. The measurements stay in PocketBase, and the count
+  shows up as `records_unsteady` in the status stats. Set
+  `SAP_DROP_UNSTEADY=false` to forward everything.
 - If SAP answers `400`, that batch is logged and skipped so it can't block the
   uplink. Any other error is retried with backoff.
 
@@ -116,6 +129,11 @@ SAP_EXCLUDE_SOURCES=              # source_ids not to upload, comma-separated (e
 SAP_START_FROM=                   # on first run, send what reached PocketBase after this ISO time (default: now)
 SAP_REALTIME=true                 # forward new measurements as soon as PocketBase announces them
 SAP_POLL_SECONDS=                 # fallback poll interval (default: 30 with realtime, 5 without)
+SAP_DROP_UNSTEADY=true            # drop measurements taken while accelerating or turning
+SAP_ACCEL_THRESHOLD_MS2=0.3       # speed change that counts as accelerating
+SAP_HEADING_RATE_THRESHOLD_DEGS=10  # heading change that counts as turning
+SAP_UNSTEADY_WINDOW_SECONDS=5     # dropped before and after each such moment
+SAP_UNSTEADY_MAX_HOLD_SECONDS=20  # longest wait for the measurements after one
 SAP_MAX_BATCH_SIZE=200            # records read per round, so also max fixes per request
 SAP_REQUEST_TIMEOUT_SECONDS=30
 SAP_RACE_REFRESH_SECONDS=30       # how often the current races are looked up (a)

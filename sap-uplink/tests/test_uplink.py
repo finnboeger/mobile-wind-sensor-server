@@ -9,6 +9,7 @@ from src.convert import format_pocketbase_ts
 from src.sap_client import SapError, SapRejectedError
 from src.settings import SapSettings
 from src.status import RaceUploads
+from src.steadiness import SteadinessConfig
 from src.target import SapTarget
 from src.uplink import CursorStore, Uplink
 
@@ -263,3 +264,75 @@ class UplinkTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SteadinessTest(unittest.TestCase):
+    """Measurements taken while accelerating or turning are not sent."""
+
+    setUp = UplinkTest.setUp
+    tearDown = UplinkTest.tearDown
+
+    def make_uplink(self, **overrides):
+        overrides.setdefault("max_batch_size", 50)
+        overrides.setdefault("steadiness", SteadinessConfig())
+        return UplinkTest.make_uplink(self, **overrides)
+
+    def boat(self, seconds, speed=3.0, heading=90.0):
+        return measurement(seconds, sensor_speed_mps=speed, sensor_heading_deg=heading)
+
+    def at(self, seconds):
+        return unittest.mock.patch("src.uplink.time.time", return_value=(T0 + timedelta(seconds=seconds)).timestamp())
+
+    def test_drops_measurements_around_acceleration_and_turns(self):
+        self.reader.records = (
+            [self.boat(s) for s in range(1, 21)]
+            + [self.boat(21, speed=4.0)]  # +1 m/s in 1 s: event at 20.5
+            + [self.boat(s, speed=4.0) for s in range(22, 41)]
+            + [self.boat(41, speed=4.0, heading=110.0)]  # 20°/s: event at 40.5
+            + [self.boat(s, speed=4.0, heading=110.0) for s in range(42, 61)]
+        )
+        uplink = self.make_uplink()
+        with self.at(1000):
+            while uplink.forward_new():
+                pass
+
+        dropped = set(range(16, 26)) | set(range(36, 46))
+        self.assertEqual(self.sap.timepoints, [timepoint(s) for s in range(1, 61) if s not in dropped])
+        self.assertEqual(uplink.stats["records_unsteady"], len(dropped))
+        self.assertEqual(uplink.cursor, ts(60))
+
+    def test_holds_back_recent_measurements_until_later_ones_arrive(self):
+        self.reader.records = [self.boat(s) for s in range(1, 11)]
+        uplink = self.make_uplink()
+        with self.at(11):
+            uplink.forward_new()
+        # 6..10 can't be judged without what follows them
+        self.assertEqual(self.sap.timepoints, [timepoint(s) for s in range(1, 6)])
+        self.assertEqual(CursorStore(self.state_file).load(), ts(5))
+        self.assertGreater(uplink.hold_until, 0)
+
+        self.reader.records += [self.boat(11, speed=5.0)] + [self.boat(s, speed=5.0) for s in range(12, 16)]
+        with self.at(16):
+            uplink.forward_new()
+        # The event at 10.5 also reaches back into the records sent before
+        self.assertEqual(self.sap.timepoints, [timepoint(s) for s in range(1, 6)])
+        self.assertEqual(uplink.cursor, ts(10))
+
+        # Nothing newer arrives: sent once they waited long enough
+        with self.at(40):
+            uplink.forward_new()
+        self.assertEqual(uplink.cursor, ts(15))
+        self.assertEqual(uplink.stats["records_unsteady"], 10)
+
+    def test_backfill_drops_unsteady_measurements(self):
+        self.reader.records = [self.boat(s) for s in range(1, 11)] + [self.boat(s, speed=6.0) for s in range(11, 31)]
+        uplink = self.make_uplink(max_batch_size=7)
+        uplink.backfill(T0, T0 + timedelta(seconds=30))
+        dropped = set(range(6, 16))
+        self.assertEqual(self.sap.timepoints, [timepoint(s) for s in range(1, 31) if s not in dropped])
+
+    def test_can_be_turned_off(self):
+        self.reader.records = [self.boat(1), self.boat(2, speed=9.0)]
+        uplink = self.make_uplink(steadiness=SteadinessConfig(enabled=False))
+        uplink.forward_new()
+        self.assertEqual(self.sap.timepoints, [timepoint(1), timepoint(2)])
