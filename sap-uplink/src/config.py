@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set
 
 from src.settings import SapSettings
+from src.steadiness import SteadinessConfig
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,17 @@ class UplinkConfig:
         self.poll_seconds = positive_number("SAP_POLL_SECONDS", "30" if self.realtime else "5")
         self.max_batch_size = positive_number("SAP_MAX_BATCH_SIZE", "200", int)
         self.request_timeout_seconds = positive_number("SAP_REQUEST_TIMEOUT_SECONDS", "30")
+
+        # Drop measurements taken while the boat accelerates or turns, as the onboard
+        # dashboard does: GPS speed and course lag behind until the client fuses them
+        # with the IMU, so the true wind is off for a few seconds (see src/steadiness.py)
+        self.steadiness = SteadinessConfig(
+            enabled=flag("SAP_DROP_UNSTEADY", True),
+            accel_threshold_ms2=positive_number("SAP_ACCEL_THRESHOLD_MS2", "0.3"),
+            heading_rate_threshold_degs=positive_number("SAP_HEADING_RATE_THRESHOLD_DEGS", "10"),
+            window_seconds=positive_number("SAP_UNSTEADY_WINDOW_SECONDS", "5"),
+            max_hold_seconds=positive_number("SAP_UNSTEADY_MAX_HOLD_SECONDS", "20"),
+        )
 
         start_from = (os.getenv("SAP_START_FROM") or "").strip()
         try:
