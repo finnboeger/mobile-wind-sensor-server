@@ -6,7 +6,10 @@ import requests
 logger = logging.getLogger(__name__)
 
 MEASUREMENTS_COLLECTION = "measurements"
-FIELDS = "id,source_id,ts,created_at,gps_lat,gps_lng,true_wind_dir_deg,true_wind_speed_mps"
+FIELDS = (
+    "id,source_id,ts,created_at,gps_lat,gps_lng,true_wind_dir_deg,true_wind_speed_mps,"
+    "sensor_speed_mps,sensor_heading_deg"
+)
 
 
 class PocketbaseReader:

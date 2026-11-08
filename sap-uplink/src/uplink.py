@@ -20,10 +20,11 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
 from src.config import UplinkConfig
-from src.convert import format_pocketbase_ts, to_wind_fix
+from src.convert import format_pocketbase_ts, parse_pocketbase_ts, to_wind_fix
 from src.pocketbase_reader import PocketbaseReader
 from src.sap_client import SapClient, SapRejectedError
 from src.status import RaceUploads, UplinkStatus
+from src.steadiness import SteadinessFilter
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,18 @@ class Uplink:
         # Failed rounds in a row, and when to try again (monotonic)
         self.failures = 0
         self.retry_at = 0.0
-        self.stats = {"fixes_sent": 0, "fixes_accepted": 0, "records_skipped": 0, "batches_rejected": 0}
+        self.stats = {
+            "fixes_sent": 0,
+            "fixes_accepted": 0,
+            "records_skipped": 0,
+            "records_unsteady": 0,
+            "batches_rejected": 0,
+        }
+        # Drops measurements taken while accelerating or turning (see src.steadiness)
+        steadiness = getattr(config, "steadiness", None)
+        self.steadiness = SteadinessFilter(steadiness) if steadiness and steadiness.enabled else None
+        # When records held back by the steadiness filter are due without newer data (monotonic)
+        self.hold_until = 0.0
 
     def init_cursor(self) -> None:
         saved = self.store.load()
@@ -121,6 +133,9 @@ class Uplink:
             timeout = self.config.poll_seconds
             if self.retry_at > time.monotonic():
                 timeout = min(timeout, self.retry_at - time.monotonic())
+            # Held-back records are sent after a while even if nothing new arrives
+            if self.hold_until > time.monotonic():
+                timeout = min(timeout, self.hold_until - time.monotonic())
             if wakeups is None:
                 time.sleep(timeout)
                 continue
@@ -180,16 +195,63 @@ class Uplink:
     def forward_new(self) -> bool:
         """Send the next batch stored after the cursor; True if more may be waiting."""
         records = self.reader.list_new(self.cursor, limit=self.config.max_batch_size)
+        self.hold_until = 0.0
         if not records:
             return False
+        full = len(records) == self.config.max_batch_size
+        keep = [True] * len(records)
+        if self.steadiness is not None:
+            # A full batch may not reach far enough ahead to judge its first record;
+            # then judge with what is there instead of waiting forever
+            decisions = self.steadiness.decide(records, time.time())
+            if decisions and decisions[0] is None and full:
+                decisions = self.steadiness.decide(records, time.time(), final=True)
+            ready = self._ready_count(records, decisions)
+            if ready < len(records):
+                self._hold(records[ready])
+                if ready == 0:
+                    return False
+                # A full batch still means more may be waiting after it
+                records = records[:ready]
+            self.steadiness.remember(records)
+            keep = decisions[: len(records)]
+            dropped = keep.count(False)
+            if dropped:
+                self.stats["records_unsteady"] += dropped
+                logger.debug(f"Dropping {dropped} measurement(s) taken while accelerating or turning")
         # If a later source fails, the whole batch is retried; SAP ignores the
         # fixes it already has, so the earlier sources aren't duplicated.
-        for source_id, source_records in self._by_source(records).items():
+        steady = [record for record, k in zip(records, keep) if k]
+        for source_id, source_records in self._by_source(steady).items():
             self._send(source_id, source_records)
         self.cursor = records[-1]["created_at"]
         self.store.save(self.cursor)
         self.status.update(cursor=self.cursor)
-        return len(records) == self.config.max_batch_size
+        return full
+
+    def _ready_count(self, records: List[Dict[str, Any]], decisions: List[Optional[bool]]) -> int:
+        """
+        How many records from the start can be handled now: those before the first
+        one still waiting for later measurements (of a source that isn't excluded).
+        """
+        ready = len(records)
+        for i, (record, decision) in enumerate(zip(records, decisions)):
+            if decision is None and record.get("source_id") not in self.config.exclude_sources:
+                ready = i
+                break
+        # The cursor can't stop between records stored at the same time
+        while 0 < ready < len(records) and records[ready]["created_at"] == records[ready - 1]["created_at"]:
+            ready -= 1
+        return ready
+
+    def _hold(self, record: Dict[str, Any]) -> None:
+        """Wake up when a held-back record is due even without newer measurements."""
+        try:
+            created = parse_pocketbase_ts(record["created_at"]).timestamp()
+        except (KeyError, TypeError, ValueError):
+            created = time.time()
+        due = created + self.steadiness.config.max_hold_seconds - time.time()
+        self.hold_until = time.monotonic() + max(due, 0.5)
 
     def backfill(
         self,
@@ -207,10 +269,32 @@ class Uplink:
         after = format_pocketbase_ts(start)
         until = format_pocketbase_ts(end)
         logger.info(f"Backfilling {after} .. {until}")
+        if self.steadiness is None:
+            for page in self.reader.iter_range(after, until, self.config.max_batch_size):
+                self._send_page(page)
+                on_page()
+            return
+        # Measurements at the end of a page are judged with the next page
+        waiting: List[Dict[str, Any]] = []
         for page in self.reader.iter_range(after, until, self.config.max_batch_size):
-            for source_id, records in self._by_source(page).items():
-                self._send(source_id, records)
+            batch = waiting + page
+            decisions = self.steadiness.decide(batch, None)
+            waiting = [record for record, decision in zip(batch, decisions) if decision is None]
+            self._send_page([r for r, d in zip(batch, decisions) if d is not None], decisions)
             on_page()
+        if waiting:
+            self._send_page(waiting, self.steadiness.decide(waiting, None, final=True))
+            on_page()
+
+    def _send_page(self, records: List[Dict[str, Any]], decisions: Optional[List[Optional[bool]]] = None) -> None:
+        """Send a backfill page, without the measurements the steadiness filter rejected."""
+        if decisions is not None:
+            decisions = [d for d in decisions if d is not None]
+            self.steadiness.remember(records)
+            self.stats["records_unsteady"] += decisions.count(False)
+            records = [record for record, keep in zip(records, decisions) if keep]
+        for source_id, source_records in self._by_source(records).items():
+            self._send(source_id, source_records)
 
     def _by_source(self, records: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
         """Group records by source, in arrival order, leaving out excluded sources."""

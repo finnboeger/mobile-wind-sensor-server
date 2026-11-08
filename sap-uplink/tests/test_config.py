@@ -65,3 +65,10 @@ class ConfigTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_steadiness_filter_is_on_by_default(self):
+        config = load()
+        self.assertTrue(config.steadiness.enabled)
+        self.assertEqual(config.steadiness.accel_threshold_ms2, 0.3)
+        self.assertFalse(load(SAP_DROP_UNSTEADY="false").steadiness.enabled)
+        self.assertEqual(load(SAP_UNSTEADY_WINDOW_SECONDS="3").steadiness.window_seconds, 3)
