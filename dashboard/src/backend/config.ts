@@ -4,7 +4,10 @@
 
 interface DashboardConfig {
   // PocketBase configuration
+  // Used by this server, e.g. http://pocketbase:8090 inside Docker
   pocketbaseUrl: string;
+  // Handed to the browser; falls back to pocketbaseUrl
+  pocketbasePublicUrl: string;
   pocketbaseAdminEmail: string;
   pocketbaseAdminPassword: string;
 
@@ -20,7 +23,9 @@ interface DashboardConfig {
 }
 
 export function loadConfig(): DashboardConfig {
-  const pocketbaseUrl = process.env.POCKETBASE_PUBLIC_URL || process.env.POCKETBASE_URL;
+  // The server talks to PocketBase directly, so startup doesn't depend on the
+  // public URL (reverse proxy, DNS) being reachable from inside the container
+  const pocketbaseUrl = process.env.POCKETBASE_URL || process.env.POCKETBASE_PUBLIC_URL;
   if (!pocketbaseUrl) {
     throw new Error("Missing POCKETBASE_URL environment variable");
   }
@@ -36,6 +41,7 @@ export function loadConfig(): DashboardConfig {
 
   return {
     pocketbaseUrl,
+    pocketbasePublicUrl: process.env.POCKETBASE_PUBLIC_URL || pocketbaseUrl,
     pocketbaseAdminEmail,
     pocketbaseAdminPassword,
     defaultTimeframeMinutes:

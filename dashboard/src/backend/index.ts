@@ -22,7 +22,9 @@ async function main() {
     // Load configuration
     console.log("Loading configuration...");
     const config = loadConfig();
-    console.log(`Configuration loaded: ${config.pocketbaseUrl}`);
+    console.log(
+      `Configuration loaded: PocketBase ${config.pocketbaseUrl} (browser: ${config.pocketbasePublicUrl})`
+    );
 
     // Initialize PocketBase client
     pocketbase = new PocketBase(config.pocketbaseUrl);
@@ -57,7 +59,7 @@ async function main() {
         defaultTimeframeMinutes: config.defaultTimeframeMinutes,
         defaultDirectionAverageMode: config.defaultDirectionAverageMode,
         defaultSmoothingWindowMinutes: config.defaultSmoothingWindowMinutes,
-        pocketbaseUrl: config.pocketbaseUrl,
+        pocketbaseUrl: config.pocketbasePublicUrl,
       });
     });
 
@@ -69,7 +71,7 @@ async function main() {
     // Start server
     app.listen(config.port, config.host, () => {
       console.log(`✓ Wind Dashboard started at http://${config.host}:${config.port}`);
-      console.log(`✓ PocketBase: ${config.pocketbaseUrl}`);
+      console.log(`✓ PocketBase: ${config.pocketbaseUrl} (browser: ${config.pocketbasePublicUrl})`);
     });
   } catch (error) {
     console.error(
