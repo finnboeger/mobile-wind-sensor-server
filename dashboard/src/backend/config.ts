@@ -39,6 +39,13 @@ export function loadConfig(): DashboardConfig {
     throw new Error("Missing POCKETBASE_ADMIN_PASSWORD environment variable");
   }
 
+  const directionAverageMode = (process.env.DIRECTION_AVERAGE_MODE || "weighted").trim().toLowerCase();
+  if (directionAverageMode !== "weighted" && directionAverageMode !== "arithmetic") {
+    throw new Error(
+      `DIRECTION_AVERAGE_MODE must be "weighted" or "arithmetic", not "${directionAverageMode}"`
+    );
+  }
+
   return {
     pocketbaseUrl,
     pocketbasePublicUrl: process.env.POCKETBASE_PUBLIC_URL || pocketbaseUrl,
@@ -46,7 +53,7 @@ export function loadConfig(): DashboardConfig {
     pocketbaseAdminPassword,
     defaultTimeframeMinutes:
       parseInt(process.env.DEFAULT_TIMEFRAME_MINUTES || "15") || 15,
-    defaultDirectionAverageMode: "weighted",
+    defaultDirectionAverageMode: directionAverageMode,
     defaultSmoothingWindowMinutes:
       parseInt(process.env.DEFAULT_SMOOTHING_WINDOW_MINUTES || "1") || 1,
     port: parseInt(process.env.PORT || "3000"),

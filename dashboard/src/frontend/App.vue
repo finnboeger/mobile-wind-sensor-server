@@ -326,6 +326,20 @@ function loadStoredSettings(): {
   return defaultSettings;
 }
 const storedSettings = loadStoredSettings();
+
+// Settings the user saved in this browser; the server's defaults don't override them
+function storedSettingKeys(): Set<string> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return new Set(Object.keys(JSON.parse(raw)));
+  } catch {
+    /* ignore */
+  }
+  return new Set();
+}
+
+type DirectionAverageMode = "weighted" | "arithmetic";
+const directionAverageMode = ref<DirectionAverageMode>("weighted");
 const timeFrameMinutes = ref(storedSettings.timeFrameMinutes);
 const settingsOpen = ref(false);
 const pendingTimeFrame = ref(timeFrameMinutes.value);
@@ -656,11 +670,12 @@ function buildMeasurementTooltip(paramsOrParam: any): string {
 // Human-readable label shown in the KPI cards
 const avgWindow = computed(() => `${avgWindowMinutes.value} min`);
 
-const averageDirection = (directions: number[]) => {
-  // Circular mean for direction
-  const sinSum = directions.reduce((s, d) => s + Math.sin((d * Math.PI) / 180), 0);
-  const cosSum = directions.reduce((s, d) => s + Math.cos((d * Math.PI) / 180), 0);
-  return ((Math.atan2(sinSum / directions.length, cosSum / directions.length) * 180) / Math.PI + 360) % 360;
+const averageDirection = (directions: number[], weights?: number[]) => {
+  // Circular mean for direction, optionally weighted (e.g. by wind speed)
+  const weight = (i: number) => weights?.[i] ?? 1;
+  const sinSum = directions.reduce((s, d, i) => s + weight(i) * Math.sin((d * Math.PI) / 180), 0);
+  const cosSum = directions.reduce((s, d, i) => s + weight(i) * Math.cos((d * Math.PI) / 180), 0);
+  return ((Math.atan2(sinSum, cosSum) * 180) / Math.PI + 360) % 360;
 };
 
 // Rolling average smoothing helpers.
@@ -714,8 +729,13 @@ const averageMeasurement = computed(() => {
   const avgSpeed =
     reliableWindow.reduce((s, m) => s + m.true_wind_speed_mps, 0) /
     reliableWindow.length;
+  // DIRECTION_AVERAGE_MODE: "weighted" weighs each direction by its wind speed,
+  // "arithmetic" counts every sample the same
   const avgDir = averageDirection(
-    reliableWindow.map((m) => m.true_wind_dir_deg)
+    reliableWindow.map((m) => m.true_wind_dir_deg),
+    directionAverageMode.value === "weighted"
+      ? reliableWindow.map((m) => m.true_wind_speed_mps)
+      : undefined
   );
   return { true_wind_speed_mps: avgSpeed, true_wind_dir_deg: avgDir };
 });
@@ -860,18 +880,55 @@ function fail(reason: string): never {
   throw new Error(reason);
 }
 
-async function getPocketBaseUrl(): Promise<string> {
-  if (window.location.hostname === "localhost") {
-    return "http://localhost:8090";
+interface ServerConfig {
+  defaultTimeframeMinutes?: number;
+  defaultDirectionAverageMode?: DirectionAverageMode;
+  defaultSmoothingWindowMinutes?: number;
+  pocketbaseUrl?: string;
+}
+
+// Defaults and the PocketBase URL from the dashboard server (env vars), or null
+// without it, e.g. on the Vite dev server
+async function loadServerConfig(): Promise<ServerConfig | null> {
+  try {
+    const res = await fetch("/api/config");
+    if (!res.ok) return null;
+    return (await res.json()) as ServerConfig;
+  } catch {
+    return null;
   }
-  const res = await fetch("/api/config");
-  const config = await res.json();
-  return config.pocketbaseUrl;
+}
+
+const isPositiveNumber = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0;
+
+function applyServerDefaults(config: ServerConfig) {
+  const stored = storedSettingKeys();
+  if (!stored.has("timeFrameMinutes") && isPositiveNumber(config.defaultTimeframeMinutes)) {
+    timeFrameMinutes.value = config.defaultTimeframeMinutes;
+  }
+  if (!stored.has("avgWindowMinutes") && isPositiveNumber(config.defaultSmoothingWindowMinutes)) {
+    avgWindowMinutes.value = config.defaultSmoothingWindowMinutes;
+  }
+  if (
+    config.defaultDirectionAverageMode === "weighted" ||
+    config.defaultDirectionAverageMode === "arithmetic"
+  ) {
+    directionAverageMode.value = config.defaultDirectionAverageMode;
+  }
+}
+
+function getPocketBaseUrl(config: ServerConfig | null): string {
+  if (config?.pocketbaseUrl) return config.pocketbaseUrl;
+  if (window.location.hostname === "localhost") return "http://localhost:8090";
+  throw new Error("Could not load the PocketBase URL from /api/config");
 }
 
 async function initializePocketBase() {
   try {
-    pb = new PocketBase(await getPocketBaseUrl());
+    const serverConfig = await loadServerConfig();
+    if (serverConfig) applyServerDefaults(serverConfig);
+    pb = new PocketBase(getPocketBaseUrl(serverConfig));
 
     // Subscribe to real-time updates
     try {
