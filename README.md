@@ -205,6 +205,7 @@ See [.env.docker](.env.docker) for complete list.
 
 **Key variables:**
 - `POCKETBASE_URL`: PocketBase connection URL
+- `POCKETBASE_PUBLIC_URL`: PocketBase URL as the browser reaches it
 - `POCKETBASE_ADMIN_TOKEN`: Admin authentication token
 - `MQTT_TOPICS`: Topic-to-source mappings (e.g., `wind/sensor1=sensor_1`)
 - `DIRECTION_AVERAGE_MODE`: `weighted` (default) or `arithmetic`

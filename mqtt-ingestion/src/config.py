@@ -23,7 +23,6 @@ class MqttConfig:
         if not self.mqtt_host:
             raise ValueError("Missing MQTT_HOST environment variable")
 
-        self.mqtt_port = int(os.getenv("MQTT_PORT") or "1883")
         self.mqtt_user = os.getenv("MQTT_USER") or ("ingestion" if builtin_broker else None)
         self.mqtt_password = os.getenv("MQTT_PASSWORD")
         # TLS is on by default, except for the stack's own broker
@@ -31,6 +30,8 @@ class MqttConfig:
         if use_tls not in ("1", "true", "yes", "0", "false", "no"):
             raise ValueError(f"MQTT_USE_TLS must be true or false, got {use_tls!r}")
         self.mqtt_use_tls = use_tls in ("1", "true", "yes")
+        # Standard ports: 8883 for MQTT over TLS, 1883 for plain MQTT
+        self.mqtt_port = int(os.getenv("MQTT_PORT") or ("8883" if self.mqtt_use_tls else "1883"))
 
         # Parse MQTT topics
         mqtt_topics_str = os.getenv("MQTT_TOPICS")

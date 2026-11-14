@@ -40,7 +40,8 @@ services:
     environment:
       # PocketBase configuration
       POCKETBASE_URL: http://pocketbase:8090
-      POCKETBASE_PUBLIC_URL: ${POCKETBASE_PUBLIC_URL:-http://pocketbase:8090}
+      # PocketBase as the browser reaches it
+      POCKETBASE_PUBLIC_URL: ${POCKETBASE_PUBLIC_URL:-http://localhost:8090}
       POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL:-admin@example.com}
       POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD:-adminadmin}
 
@@ -76,7 +77,7 @@ services:
     environment:
       # MQTT configuration
       # Empty values fall back to defaults in mqtt-ingestion/src/config.py: an
-      # external broker over TLS, or with COMPOSE_PROFILES=mosquitto the stack's
+      # external broker over TLS (port 8883), or with COMPOSE_PROFILES=mosquitto the stack's
       # own broker (host mosquitto, port 1883, no TLS, user "ingestion")
       MQTT_HOST: ${MQTT_HOST:-}
       MQTT_PORT: ${MQTT_PORT:-}
